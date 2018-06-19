@@ -56,7 +56,23 @@
 
 #include <Urho3D/DebugNew.h>
 
+#include <import/OctreeIntermediateNode.h>
+#include <utility/RCFilesystem.h>
+#include <common/RCString.h>
+#include <common/RCMemoryHelper.h>
+#include <common/RCMemoryMapFile.h>
+
+#include <Urho3D/PointCloud/AgOctreeDefinitions.h>
+#include <Urho3D/PointCloud/AgVoxelLidarPoints.h>
+#include <Urho3D/PointCloud/AgVoxelTerrestialPoints.h>
+#include <Urho3D/PointCloud/AgPointCloudEngine.h>
+
 using namespace Urho3D;
+
+using namespace ambergris::RealityComputing::Common;
+using namespace ambergris::RealityComputing::Import;
+using namespace ambergris::RealityComputing::Utility;
+using namespace ambergris::PointCloudEngine;
 
 struct OutModel
 {
@@ -240,6 +256,285 @@ String SanitateAssetName(const String& name);
 unsigned GetPivotlessBoneIndex(OutModel& model, const String& boneName);
 void ExtrapolatePivotlessAnimation(OutModel* model);
 void CollectSceneNodesAsBones(OutModel &model, aiNode* rootNode);
+
+template<class Iter>
+bool hasTimeStampChunk(const Iter& start, const Iter& end)
+{
+	return end != std::find_if(start, end, [](const OctreeFileChunk& ofc) -> bool {
+		return (ofc.m_chunkId == ENUM_FILE_CHUNK_ID_TIME_STAMP);
+	});
+}
+
+bool ExportPointCloudFile(const String& inputName, const String& outPath)
+{
+	RCString fileName(inputName.CString());
+
+	bool legacyFileFormat = false;
+	if (!Filesystem::exists(fileName.w_str()))
+		return false;
+
+	// read file header
+	// check file size
+	long long fileSize = Filesystem::fileSize(fileName.w_str());
+	if (fileSize <= static_cast<long long>(sizeof(OctreeFileHeader)))
+		return false;
+
+	OctreeFileHeader fileHeader;
+	RCMemoryMapFile memmapFile(fileName.c_str());
+	if (!memmapFile.createFileHandleOnlyRead())
+		return false;
+	memmapFile.setFilePointer(0);
+	if (!memmapFile.readFile(&fileHeader, sizeof(OctreeFileHeader)))
+		return false;
+	if (fileHeader.m_magicWord[0] != 'A' || fileHeader.m_magicWord[1] != 'D' ||
+		fileHeader.m_magicWord[2] != 'O' || fileHeader.m_magicWord[3] != 'C' ||
+		fileHeader.m_magicWord[4] != 'T')
+	{
+		return false;
+	}
+
+	// check version
+	if (fileHeader.m_majorVersion == 3 && fileHeader.m_minorVersion == 1)
+	{
+		legacyFileFormat = true;
+	}
+	else if (fileHeader.m_majorVersion > MAJOR_VERSION)
+	{
+		return false;
+	}
+	else if (fileHeader.m_majorVersion != MAJOR_VERSION || fileHeader.m_minorVersion != MINOR_VERSION)
+	{
+		return false;
+	}
+
+	SharedPtr<Scene> outScene(new Scene(context_));
+	AgPointCloudEngine* pointCloudEngine = outScene->CreateComponent<AgPointCloudEngine>();
+
+	Vector3 sceneOffset = Vector3((float)fileHeader.m_translation.x, (float)fileHeader.m_translation.y, (float)fileHeader.m_translation.z);
+	pointCloudEngine->setOffset(sceneOffset);
+
+	Node* pNode = outScene->CreateChild("PointCloud");
+	pNode->SetPosition(Vector3((float)fileHeader.m_translation.x, (float)fileHeader.m_translation.y, (float)fileHeader.m_translation.z) - sceneOffset);
+	pNode->SetRotation(Quaternion((float)fileHeader.m_rotation.x, (float)fileHeader.m_rotation.y, (float)fileHeader.m_rotation.z));
+	pNode->SetScale(Vector3((float)fileHeader.m_scale.x, (float)fileHeader.m_scale.y, (float)fileHeader.m_scale.z));
+
+	RCRotationMatrix rotMat(fileHeader.m_rotation, fileHeader.m_scale);
+	RCTransform transform = RCTransform(rotMat, fileHeader.m_translation);
+
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA, Variant(true));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_SCANNERORIGIN, Variant(Vector3((float)fileHeader.m_scannerOrigin.x, (float)fileHeader.m_scannerOrigin.y, (float)fileHeader.m_scannerOrigin.z) - sceneOffset));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_OCTREEFLAGS, Variant(fileHeader.m_octreeFlags));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_TOTALPOINTS, Variant(fileHeader.m_totalAmountOfPoints));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_HASRGB, Variant(fileHeader.mHasRGB));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_HASNORMALS, Variant(fileHeader.mHasNormals));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_HASINTENSITY, Variant(fileHeader.mHasIntensity));
+
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_SVOBOUNDSMIN, Variant(Vector3((float)fileHeader.m_svoBounds.getMin().x, (float)fileHeader.m_svoBounds.getMin().y, (float)fileHeader.m_svoBounds.getMin().z)));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_SVOBOUNDSMAX, Variant(Vector3((float)fileHeader.m_svoBounds.getMax().x, (float)fileHeader.m_svoBounds.getMax().y, (float)fileHeader.m_svoBounds.getMax().z)));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_SCANBOUNDSMIN, Variant(Vector3((float)fileHeader.m_scanBounds.getMin().x, (float)fileHeader.m_scanBounds.getMin().y, (float)fileHeader.m_scanBounds.getMin().z)));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_SCANBOUNDSMAX, Variant(Vector3((float)fileHeader.m_scanBounds.getMax().x, (float)fileHeader.m_scanBounds.getMax().y, (float)fileHeader.m_scanBounds.getMax().z)));
+
+	int amountOfChunks = fileHeader.m_numFileChunks;
+
+	std::vector<OctreeFileChunk> chunkList;
+	chunkList.clear();
+
+	//parse chunks
+	for (int i = 0; i < amountOfChunks; i++)
+		chunkList.push_back(fileHeader.m_fileChunkEntries[i]);
+
+	//some check
+	assert(int(chunkList.size()) >= 2);
+
+	if (legacyFileFormat)
+		return false;
+
+	OctreeFileChunk umbrellaChunk; //= m_chunkList[0];
+	OctreeFileChunk nodeDataChunk;// = m_chunkList[1];
+	OctreeFileChunk extendedChunk;// = m_chunkList[2];
+	OctreeFileChunk timeStampChunk;// = m_chunkList[3];
+	bool foundExtendedChunk = false;
+	bool foundUmbrellaChunk = false;
+	bool foundNodeDataChunk = false;
+	bool foundTimeStampChunk = false;
+	for (size_t i = 0; i < chunkList.size(); i++)
+	{
+		if (chunkList.at(i).m_chunkId == ENUM_FILE_CHUNK_ID_OTHERS)
+		{
+			extendedChunk = chunkList.at(i);
+			foundExtendedChunk = true;
+		}
+		else if (chunkList.at(i).m_chunkId == ENUM_FILE_CHUNK_ID_UMBRELLA_OCTREE_DATA)
+		{
+			umbrellaChunk = chunkList.at(i);
+			foundUmbrellaChunk = true;
+		}
+		else if (chunkList.at(i).m_chunkId == ENUM_FILE_CHUNK_ID_VOXEL_DATA)
+		{
+			nodeDataChunk = chunkList.at(i);
+			foundNodeDataChunk = true;
+		}
+		else if (chunkList.at(i).m_chunkId == ENUM_FILE_CHUNK_ID_TIME_STAMP)
+		{
+			timeStampChunk = chunkList.at(i);
+			foundTimeStampChunk = true;
+		}
+	}
+
+	bool isLidarData = true;
+	if (foundExtendedChunk && extendedChunk.m_fileOffsetStart > 0 && extendedChunk.m_sizeInBytes > 0)
+	{
+		memmapFile.setFilePointer(extendedChunk.m_fileOffsetStart);
+		std::int64_t filePointer = extendedChunk.m_fileOffsetStart;
+		int infoId = 0;
+		int infoSize = 0;
+		int infoNum = memmapFile.readInt(filePointer, filePointer);
+		int count = 0;
+		while (count < infoNum)
+		{
+			// get info id & info size
+			infoId = memmapFile.readInt(filePointer, filePointer);
+			infoSize = memmapFile.readInt(filePointer, filePointer);
+			if (infoId == INFO_ID_IS_LIDAR_DATA)
+			{
+				isLidarData = memmapFile.readBool(filePointer, filePointer);
+				pNode->SetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA, Variant(isLidarData));
+			}
+			/*else if (infoId == INFO_ID_LIDAR_CLASSIFICATION)
+			{
+				for (int i = 0; i < 256; i++)
+					lidarClassifications[i] = memmapFile.readBool(filePointer, filePointer);
+			}*/
+			else
+			{
+				char unknown;
+				for (int i = 0; i < infoSize; i++)
+					unknown = memmapFile.readChar(filePointer, filePointer);
+			}
+
+			count++;
+		}
+	}
+
+	String outName = outPath + "/" + "sdfd";
+	if (foundUmbrellaChunk && foundNodeDataChunk)
+	{
+		std::uint64_t timeStampOffset = 0;
+		if ((fileHeader.m_octreeFlags & ENUM_OCTREE_FLAGS_HAS_TIME_STAMP) && foundTimeStampChunk)
+		{
+			memmapFile.setFilePointer(timeStampChunk.m_fileOffsetStart);
+			int totalIntermediateLeafNodes = 0;
+			memmapFile.readFile(&totalIntermediateLeafNodes, sizeof(int));
+
+			timeStampOffset = timeStampChunk.m_fileOffsetStart + sizeof(int);
+		}
+
+		std::uint64_t numLeafs = 0;
+		memmapFile.setFilePointer(umbrellaChunk.m_fileOffsetStart);
+		memmapFile.readFile(&numLeafs, sizeof(std::uint64_t));
+
+		if (numLeafs > 0)
+		{
+			OctreeLeafSaveData* leafDataList = new OctreeLeafSaveData[int(numLeafs)];
+
+			//point to leaf information
+			memmapFile.setFilePointer(umbrellaChunk.m_fileOffsetStart + sizeof(numLeafs));
+			memmapFile.readFile(&leafDataList[0], sizeof(OctreeLeafSaveData) * int(numLeafs));
+
+			std::uint64_t cumulativeOffset = 0;
+			std::uint64_t cumulativeUmbrellaOffset = umbrellaChunk.m_fileOffsetStart + sizeof(std::uint64_t);
+
+			//fill in voxel containers
+			for (int i = 0; i < int(numLeafs); i++)
+			{
+				OctreeLeafSaveData curLeaf = leafDataList[i];
+				AgVoxelContainer* runTimeLod = pNode->CreateComponent<AgVoxelContainer>();
+				//runTimeLod->m_nodeBounds = curLeaf.m_nodeBounds;
+
+				runTimeLod->SetSVOBoundsMin(Vector3((float)curLeaf.m_svoBounds.getMin().x, (float)curLeaf.m_svoBounds.getMin().y, (float)curLeaf.m_svoBounds.getMin().z));
+				runTimeLod->SetSVOBoundsMax(Vector3((float)curLeaf.m_svoBounds.getMax().x, (float)curLeaf.m_svoBounds.getMax().y, (float)curLeaf.m_svoBounds.getMax().z));
+				runTimeLod->SetAmountOfPoints( curLeaf.m_amountOfPoints );
+
+				int cumLeafPoints = 0;
+				int cumNodePoints = 0;
+
+				VariantVector LODInfo;
+				for (int j = 0; j < curLeaf.m_maxDepth; j++)
+				{
+					//cumulative stuff
+					cumLeafPoints += curLeaf.m_numLeafNodes[j];
+					cumNodePoints += curLeaf.m_numLeafNodes[j] + curLeaf.m_numNonLeafNodes[j];
+
+					LODInfo.Push(curLeaf.m_numLeafNodes[j] + curLeaf.m_numNonLeafNodes[j]);
+					LODInfo.Push(curLeaf.m_numNonLeafNodes[j] + cumLeafPoints);
+				}
+				runTimeLod->SetLODInfoAttr(LODInfo);
+
+				//////
+				int pointSizeInBytes = sizeof(AgVoxelLeafNode)     * cumLeafPoints;
+				int nodeSizeInBytes = sizeof(AgVoxelInteriorNode) * cumNodePoints;
+
+				//runTimeLod->m_nodeOffsetStart = cumulativeOffset + nodeDataChunk.m_fileOffsetStart;
+				std::uint64_t pointDataOffsetStart = cumulativeOffset + nodeSizeInBytes + nodeDataChunk.m_fileOffsetStart;
+				//runTimeLod->m_umbrellaNodeOffsetStart = cumulativeUmbrellaOffset;
+				if (pointSizeInBytes > 0)
+				{
+					File resourcefile(context_);
+					Urho3D::String resourceName = outPath + Urho3D::String(i) + ".vxl";
+					if (resourcefile.Open(resourceName, FILE_WRITE))
+					{
+						if (resourcefile.WriteFileID("PCVL"))
+						{
+							resourcefile.WriteUInt((unsigned)cumLeafPoints);
+
+							std::vector<AgVoxelLeafNode> rawPoints(pointSizeInBytes);
+							memmapFile.setFilePointer(pointDataOffsetStart);
+							memmapFile.readFile(&rawPoints[0], pointSizeInBytes);
+
+							resourcefile.Write(&rawPoints[0], pointSizeInBytes);
+
+							if (foundTimeStampChunk && timeStampOffset > 0)
+							{
+								std::vector<double> timeStampData;
+								timeStampData.resize(cumLeafPoints);
+								memmapFile.setFilePointer(timeStampOffset);
+								memmapFile.readFile(&timeStampData[0], sizeof(double) * cumLeafPoints);
+
+								resourcefile.Write(&timeStampData[0], sizeof(double) * cumLeafPoints);
+
+								timeStampOffset += sizeof(double) * runTimeLod->GetAmountOfPoints();
+							}
+
+							runTimeLod->SetVoxelPointsAttr(ResourceRef(isLidarData ? AgVoxelLidarPoints::GetTypeStatic() : AgVoxelTerrestialPoints::GetTypeStatic(), resourceName));
+						}
+					}
+					resourcefile.Close();
+				}
+
+				//update cumulative offset
+				cumulativeOffset += (pointSizeInBytes + nodeSizeInBytes);
+				cumulativeUmbrellaOffset += sizeof(OctreeLeafSaveData);
+
+			}
+			//free
+			DeleteArr(leafDataList);
+		}
+	}
+
+	memmapFile.closeMemoryMapHandleOnlyRead();
+	memmapFile.closeFileHandle();
+
+	File file(context_);
+	if (!file.Open(outName + ".xml", FILE_WRITE))
+		ErrorExit("Could not open output file " + outName);
+	if (saveBinary_)
+		outScene->Save(file);
+	else if (saveJson_)
+		outScene->SaveJSON(file);
+	else
+		outScene->SaveXML(file);
+	return true;
+}
 
 int main(int argc, char** argv)
 {
@@ -501,6 +796,12 @@ void Run(const Vector<String>& arguments)
             Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE, aiDefaultLogStream_STDOUT);
 
         PrintLine("Reading file " + inFile);
+
+		if (inFile.EndsWith(".rcs", false))
+		{
+			ExportPointCloudFile(inFile, outPath_);
+			return;
+		}
 
         if (!inFile.EndsWith(".fbx", false))
             suppressFbxPivotNodes_ = false;
