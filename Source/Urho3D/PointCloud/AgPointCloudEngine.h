@@ -62,6 +62,8 @@ namespace ambergris {
 			static const Urho3D::StringHash VAR_HASNORMALS("HasNormals");
 			static const Urho3D::StringHash VAR_HASINTENSITY("HasIntensity");
 			static const Urho3D::StringHash VAR_LIDARDATA("IsLidarData");
+			static const Urho3D::StringHash VAR_MATERIAL("Material");
+			static const Urho3D::StringHash VAR_POINTSIZE("PointSize");
 
 			static const Urho3D::StringHash VAR_SVOBOUNDSMIN("svoBoundsMin");
 			static const Urho3D::StringHash VAR_SVOBOUNDSMAX("svoBoundsMax");

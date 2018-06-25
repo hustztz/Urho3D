@@ -16,7 +16,6 @@ using namespace ambergris::PointCloudEngine;
 AgVoxelLidarPoints::AgVoxelLidarPoints(Context* context) :
 	AgVoxelPoints(context)
 {
-	geometry_ = new Geometry(context_);
 }
 
 AgVoxelLidarPoints::~AgVoxelLidarPoints() = default;
@@ -26,7 +25,7 @@ void AgVoxelLidarPoints::RegisterObject(Context* context)
 	context->RegisterFactory<AgVoxelLidarPoints>();
 }
 
-bool AgVoxelLidarPoints::BeginLoad(Deserializer& source, unsigned offset, unsigned size)
+bool AgVoxelLidarPoints::BeginLoad(Deserializer& source)
 {
 	Urho3D::String fileID = source.ReadFileID();
 	if (fileID != "PCVL")
@@ -35,16 +34,20 @@ bool AgVoxelLidarPoints::BeginLoad(Deserializer& source, unsigned offset, unsign
 		return false;
 	}
 
-	const unsigned   totalPoints = source.ReadUInt();
+	// Read offset
+	Vector3 offset = source.ReadVector3();
+
+	const unsigned   amountOfPoints = source.ReadUInt();
 
 	// Read voxel buffers
-	const unsigned needPoints = std::min((offset + size), totalPoints);
-	m_lidarPointList.resize(needPoints);
+	m_lidarPointList.resize(amountOfPoints);
 
-	for (unsigned i = offset; i < needPoints; ++i)
+	for (unsigned i = 0; i < amountOfPoints; ++i)
 	{
-		AgVoxelLeafNode rawPoint(source.ReadUInt64(), source.ReadUInt64());
-		m_lidarPointList[i].setRawCoord(rawPoint.getRawOffsetFromBoundingBox());
+		std::uint64_t data1 = source.ReadUInt64();
+		std::uint64_t data2 = source.ReadUInt64();
+		AgVoxelLeafNode rawPoint(data1, data2);
+		m_lidarPointList[i].setRawCoord(rawPoint.getRawOffsetFromBoundingBox() * 0.001f + RCVector3f(offset.x_, offset.y_, offset.z_));
 		m_lidarPointList[i].setRGBA(rawPoint.getRGBA());
 		m_lidarPointList[i].setNormalIndex(rawPoint.getNormal());
 		m_lidarPointList[i].setLidarClassification(rawPoint.getLidarClassification());
@@ -55,10 +58,8 @@ bool AgVoxelLidarPoints::BeginLoad(Deserializer& source, unsigned offset, unsign
 		}
 	}
 
-	int pointSizeInBytes = sizeof(AgVoxelLeafNode)     * totalPoints;
-	source.Seek(pointSizeInBytes + fileID.Length() + 4);
-	const unsigned amountOfTimestamps = std::min((offset + size), source.ReadUInt());
-	for (unsigned i = offset; i < amountOfTimestamps; ++i)
+	m_timeStampList.resize(amountOfPoints);
+	for (unsigned i = 0; i < amountOfPoints; ++i)
 	{
 		m_timeStampList[i] = source.ReadDouble();
 	}
@@ -72,20 +73,21 @@ bool AgVoxelLidarPoints::EndLoad()
 		return true;
 
 	PODVector<VertexElement> elements;
-	elements.Push(VertexElement(TYPE_VECTOR3, SEM_POSITION, 0));
-	elements.Push(VertexElement(TYPE_UBYTE4_NORM, SEM_COLOR, 1));
-	elements.Push(VertexElement(TYPE_INT, SEM_TEXCOORD, 2));
+	elements.Push(VertexElement(TYPE_VECTOR3, SEM_POSITION));
+	elements.Push(VertexElement(TYPE_UBYTE4_NORM, SEM_COLOR));
+	elements.Push(VertexElement(TYPE_INT, SEM_TEXCOORD));
 
 	// Upload vertex buffer data
-	SharedPtr<VertexBuffer> buffer(new VertexBuffer(context_));
-	buffer->SetShadowed(false);
-	buffer->SetSize(m_lidarPointList.size(), elements);
-	buffer->SetData(m_lidarPointList.data());
-	vertexBuffers_.Push(buffer);
+	if(!vertexBuffers_)
+		vertexBuffers_ = new VertexBuffer(context_);
+	vertexBuffers_->SetShadowed(false);
+	vertexBuffers_->SetSize(m_lidarPointList.size(), elements);
+	vertexBuffers_->SetData(m_lidarPointList.data());
 	
-	const unsigned existedNumVB = geometry_->GetNumVertexBuffers();
-	geometry_->SetNumVertexBuffers(existedNumVB + 1);
-	geometry_->SetVertexBuffer(existedNumVB, buffer);
+	if(!geometry_)
+		geometry_ = new Geometry(context_);
+	geometry_->SetPrimitiveType(POINT_LIST);
+	geometry_->SetVertexBuffer(0, vertexBuffers_);
 
 	m_lidarPointList.clear();
 	m_timeStampList.clear();
@@ -118,5 +120,5 @@ std::uint64_t	AgVoxelLidarPoints::clear()
 
 std::uint64_t	AgVoxelLidarPoints::getAllocatedMemory() const
 {
-	return (sizeof(AgLidarPoint) * m_lidarPointList.size());
+	return (sizeof(AgLidarPoint) * m_lidarPointList.size() + sizeof(double) * m_timeStampList.size());
 }

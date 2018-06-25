@@ -28,13 +28,16 @@ namespace ambergris {
 			static void RegisterObject(Urho3D::Context* context);
 
 			/// Load resource from stream. May be called from a worker thread. Return true if successful.
-			bool BeginLoad(Urho3D::Deserializer& source, unsigned offset, unsigned size) override;
+			bool BeginLoad(Urho3D::Deserializer& source) override;
 			/// Finish resource loading. Always called from the main thread. Return true if successful.
 			bool EndLoad() override;
 
 			bool isEmpty() const;
 			std::uint64_t							clear() override;
+			std::uint32_t	getCount() const override {	return (std::uint32_t)m_lidarPointList.size();	}
 			std::uint64_t	getAllocatedMemory() const override;
+			/// Return geometry by index and LOD level. The LOD level is clamped if out of range.
+			Urho3D::Geometry* getGeometry() const override { return geometry_; }
 
 			bool hasTimestamp() const { return !m_timeStampList.empty(); }
 		private:
@@ -42,7 +45,7 @@ namespace ambergris {
 			std::vector<double>                m_timeStampList;
 
 			/// Vertex buffers.
-			Urho3D::Vector<Urho3D::SharedPtr<Urho3D::VertexBuffer> > vertexBuffers_;
+			Urho3D::SharedPtr<Urho3D::VertexBuffer> vertexBuffers_;
 			/// Geometries.
 			Urho3D::SharedPtr<Urho3D::Geometry> geometry_;
 		};

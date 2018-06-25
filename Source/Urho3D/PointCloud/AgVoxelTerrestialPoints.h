@@ -6,6 +6,13 @@
 
 #include <vector>
 
+namespace Urho3D
+{
+	class Geometry;
+	class Graphics;
+	class VertexBuffer;
+}
+
 namespace ambergris {
 	namespace PointCloudEngine {
 
@@ -28,10 +35,16 @@ namespace ambergris {
 
 			bool isEmpty() const;
 			std::uint64_t							clear() override;
+			std::uint32_t	getCount() const override { return (std::uint32_t)m_terrestialPointList.size(); }
 			std::uint64_t	getAllocatedMemory() const override;
+			/// Return geometry by index and LOD level. The LOD level is clamped if out of range.
+			Urho3D::Geometry* getGeometry() const override { return geometry_; }
 		private:
 			std::vector<AgTerrestialPoint>     m_terrestialPointList;
 			std::vector<std::uint16_t>         m_terrestialSegIdList;
+
+			/// Geometries.
+			Urho3D::SharedPtr<Urho3D::Geometry> geometry_;
 		};
 	}
 }

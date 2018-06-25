@@ -2,6 +2,11 @@
 
 #include "../Resource/Resource.h"
 
+namespace Urho3D
+{
+	class Geometry;
+}
+
 namespace ambergris {
 	namespace PointCloudEngine {
 
@@ -15,8 +20,9 @@ namespace ambergris {
 
 			virtual bool isEmpty() const = 0;
 			virtual std::uint64_t							clear() = 0;
+			virtual std::uint32_t	getCount() const = 0;
 			virtual std::uint64_t	getAllocatedMemory() const = 0;
-
+			virtual Urho3D::Geometry* getGeometry() const = 0;
 		};
 	}
 }

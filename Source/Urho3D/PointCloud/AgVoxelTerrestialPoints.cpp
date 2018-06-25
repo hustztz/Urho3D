@@ -3,6 +3,7 @@
 #include "../Core/Context.h"
 #include "../IO/Log.h"
 #include "../IO/File.h"
+#include "../Graphics/Geometry.h"
 
 using namespace Urho3D;
 using namespace ambergris::RealityComputing::Common;

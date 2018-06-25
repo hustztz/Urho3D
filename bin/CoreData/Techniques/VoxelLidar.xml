@@ -1,0 +1,3 @@
+<technique vs="SplatLidar" ps="SplatLidar" vsdefines="VERTEXCOLOR SOFTPARTICLES" psdefines="VERTEXCOLOR">
+    <pass name="base" enablePointSize="true"/>
+</technique>

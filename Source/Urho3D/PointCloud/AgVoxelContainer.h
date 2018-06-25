@@ -3,8 +3,6 @@
 #include "../Graphics/Drawable.h"
 #include "../Math/BoundingBox.h"
 
-#include "AgLidarPoint.h"
-#include "AgTerrestialPoint.h"
 #include "AgOctreeDefinitions.h"
 
 #include <utility/RCMutex.h>
@@ -43,18 +41,18 @@ namespace ambergris {
 
 			std::uint32_t							getLODPointCount(std::uint8_t lod) const;
 
-			bool									isGeometryEmpty() const;
+			bool									isGeometryEmpty() const {	return voxelPointsArr_.Empty();	}
 			std::uint64_t							clearGeometry();
 			std::uint64_t							getAllocatedMemory() const;
 
 			//////////////////////////////////////////////////////////////////////////
 			// \brief: load a LIDAR LOD from disk this is a
 			//////////////////////////////////////////////////////////////////////////
-			void                                    loadLODInternal(bool isLidarData, int lodLevel, bool lock = false);
+			void                                    loadLODInternal(bool isLidarData, std::uint8_t lodLevel);
 
 			RealityComputing::Common::RCBox                       getSVOBound() const;
 
-			bool                                    isComplete(int LOD) const;
+			bool                                    isComplete(unsigned LOD) const;
 
 			// \brief:  clip status function
 			bool                                    isClipFlag(ClipFlag rhs) const;
@@ -64,21 +62,18 @@ namespace ambergris {
 			void                                    setClipIndex(int nClipIndex) { m_nClipIndex = nClipIndex; }
 
 			/// Set geometry.
-			void SetVoxelPoints(AgVoxelPoints* geometry);
+			void SetVoxelPoints(AgVoxelPoints* points);
 			/// Return geometry.
-			AgVoxelPoints* GetVoxelPoints() const { return voxelPoints_; }
+			AgVoxelPoints* GetVoxelPoints(std::uint8_t lod) const { return voxelPointsArr_.At(lod); }
 			/// Return geometry attribute.
-			Urho3D::ResourceRef GetVoxelPointsAttr() const;
+			const Urho3D::String& GetResourceName() const { return resourceName_; }
 			/// Set geometry attribute.
-			void SetVoxelPointsAttr(const Urho3D::ResourceRef& value);
+			void SetResourceName(const Urho3D::String& name) { resourceName_ = name; }
 
-			/// Get wheel data attribute for serialization.
-			Urho3D::VariantVector GetLODInfoAttr() const;
-			/// Set wheel data attribute during loading.
-			void SetLODInfoAttr(const Urho3D::VariantVector& value);
-
-			int GetAmountOfOctreeNodes(std::uint8_t lod) const;
-			int GetAmountOfLODPoints(std::uint8_t lod) const;
+			/// Return layout spacing.
+			char GetMaxLOD() const { return maximumLOD_; }
+			/// Set layout spacing.
+			void SetMaxLOD(char num) { maximumLOD_ = num; }
 
 			/// Return layout spacing.
 			int GetAmountOfPoints() const { return amountOfPoints_; }
@@ -100,32 +95,35 @@ namespace ambergris {
 			const Urho3D::Vector3& GetSVOBoundsMax() const { return boundingBox_.max_; }
 
 		protected:
+			std::uint8_t  CalcLOD(const Urho3D::FrameInfo& frame, float pointSize);
 			/// Handle a background loaded resource completing.
 			void HandleResourceBackgroundLoaded(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
 			/// Recalculate the world-space bounding box.
 			void OnWorldBoundingBoxUpdate() override;
+
+			void HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
+			void HandlePostRenderUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
 		public:
 			int                                m_currentLODLoaded;             //LOD level loaded in cache
 			int                                m_currentDrawLOD;               //LOD currently used for drawing
-
-			int                                m_maximumLOD;                   //maximum LOD stored in file
 
 			//int                              m_originalIndex;                //original index into VoxelTreeRunTime::m_originalScanContainerList;
 
 			RealityComputing::Common::RCBox                       m_nodeBounds;                   //node bounds
 			RealityComputing::Common::RCBox                       m_svoBounds;                    //voxel bounds
 
-			struct VoxelLODInfo {
+			/*struct VoxelLODInfo {
 				int                                m_amountOfOctreeNodes;
 				int                                m_amountOfLODPoints;
-			};
+			};*/
 			double							   m_lastTimeModified;             //last time this node was modified/seen
 																			//TODO: we shall check if we are allowed to change the stack sequence of class members
 		private:
-			Urho3D::SharedPtr<AgVoxelPoints>			voxelPoints_;
-
-			Urho3D::PODVector<VoxelLODInfo>				LODInfos_;
-			int                                amountOfPoints_;               //total amount of points
+			Urho3D::Vector<AgVoxelPoints*>		voxelPointsArr_;
+			Urho3D::String								resourceName_;
+			std::uint8_t                                currentDrawLOD_;
+			std::uint8_t                                maximumLOD_;                   //maximum LOD stored in file
+			std::uint32_t                               amountOfPoints_;               //total amount of points
 												//TODO: we shall check if we are allowed to change the stack sequence of class members
 												//      and stack public/private member together.
 		
@@ -135,8 +133,6 @@ namespace ambergris {
 			ClipFlag                                mInternalClipFlag;
 			// \brief: the index which indicates the point number of valid clip flag
 			int                                     m_nClipIndex;
-
-			int                                     m_numOldPoints;
 		};
 	}
 }

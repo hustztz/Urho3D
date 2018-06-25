@@ -6,9 +6,13 @@
 
 #include "../IO/Log.h"
 #include "../Core/Context.h"
+#include "../Core/CoreEvents.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/Material.h"
 #include "../Resource/ResourceCache.h"
 #include "../Resource/ResourceEvents.h"
+
+#include <algorithm>
 
 using namespace Urho3D;
 using namespace ambergris::RealityComputing::Common;
@@ -22,10 +26,12 @@ AgVoxelContainer::AgVoxelContainer(Context* context) :
 	m_nClipIndex(0),
 	m_currentLODLoaded(-1),
 	m_currentDrawLOD(0),
-	m_maximumLOD(0),
-	m_lastTimeModified(0),
-	m_numOldPoints(0)
+	maximumLOD_(0),
+	currentDrawLOD_(0),
+	m_lastTimeModified(0)
 {
+	SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(AgVoxelContainer, HandleUpdate));
+	SubscribeToEvent(E_POSTRENDERUPDATE, URHO3D_HANDLER(AgVoxelContainer, HandlePostRenderUpdate));
 }
 
 AgVoxelContainer::~AgVoxelContainer() = default;
@@ -35,69 +41,136 @@ void AgVoxelContainer::RegisterObject(Context* context)
 	context->RegisterFactory<AgVoxelContainer>();
 
 	URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
-	URHO3D_MIXED_ACCESSOR_ATTRIBUTE("VoxelPoints", GetVoxelPointsAttr, SetVoxelPointsAttr, ResourceRef, ResourceRef(AgVoxelPoints::GetTypeStatic()), AM_DEFAULT);
-	URHO3D_MIXED_ACCESSOR_ATTRIBUTE("LOD Infos", GetLODInfoAttr, SetLODInfoAttr, VariantVector, Variant::emptyVariantVector, AM_DEFAULT);
+	URHO3D_ACCESSOR_ATTRIBUTE("Resource Name", GetResourceName, SetResourceName, String, String::EMPTY, AM_DEFAULT);
+	//URHO3D_MIXED_ACCESSOR_ATTRIBUTE("LOD Infos", GetLODInfoAttr, SetLODInfoAttr, VariantVector, Variant::emptyVariantVector, AM_DEFAULT);
 	URHO3D_ACCESSOR_ATTRIBUTE("Amount Of Points", GetAmountOfPoints, SetAmountOfPoints, int, 0, AM_FILE);
+	URHO3D_ACCESSOR_ATTRIBUTE("Maximum LOD", GetMaxLOD, SetMaxLOD, int, 0, AM_FILE);
 	URHO3D_ACCESSOR_ATTRIBUTE("SVO Bounds Min", GetSVOBoundsMin, SetSVOBoundsMin, Vector3, Vector3::ZERO, AM_FILE);
 	URHO3D_ACCESSOR_ATTRIBUTE("SVO Bounds Max", GetSVOBoundsMax, SetSVOBoundsMax, Vector3, Vector3::ZERO, AM_FILE);
 }
 
-void AgVoxelContainer::UpdateBatches(const FrameInfo& frame)
+uint8_t  AgVoxelContainer::CalcLOD(const FrameInfo& frame, float pointSize)
 {
 	const BoundingBox& worldBoundingBox = GetWorldBoundingBox();
-	distance_ = frame.camera_->GetDistance(worldBoundingBox.Center());
 
-	if (batches_.Size() == 1)
-		batches_[0].distance_ = distance_;
-	else
+	Vector3 voxCorners[8];
+	voxCorners[0] = Vector3(worldBoundingBox.min_.x_, worldBoundingBox.min_.y_, worldBoundingBox.min_.z_);
+	voxCorners[1] = Vector3(worldBoundingBox.max_.x_, worldBoundingBox.min_.y_, worldBoundingBox.min_.z_);
+	voxCorners[2] = Vector3(worldBoundingBox.min_.x_, worldBoundingBox.max_.y_, worldBoundingBox.min_.z_);
+	voxCorners[3] = Vector3(worldBoundingBox.max_.x_, worldBoundingBox.max_.y_, worldBoundingBox.min_.z_);
+
+	voxCorners[4] = Vector3(worldBoundingBox.min_.x_, worldBoundingBox.min_.y_, worldBoundingBox.max_.z_);
+	voxCorners[5] = Vector3(worldBoundingBox.max_.x_, worldBoundingBox.min_.y_, worldBoundingBox.max_.z_);
+	voxCorners[6] = Vector3(worldBoundingBox.min_.x_, worldBoundingBox.max_.y_, worldBoundingBox.max_.z_);
+	voxCorners[7] = Vector3(worldBoundingBox.max_.x_, worldBoundingBox.max_.y_, worldBoundingBox.max_.z_);
+	const Frustum& frustum = frame.camera_->GetFrustum();
+	/*RCVector3d min = voxelBounds.getMin();
+	RCVector3d max = voxelBounds.getMax();
+
+	BoundingBox voxBounds(Vector3((float)min.x, (float)min.y, (float)min.z), Vector3((float)max.x, (float)max.y, (float)max.z));
+
+	if (OUTSIDE == frustum.IsInside(voxBounds))
+	return 0;*/
+
+	bool anyBehind = false;
+	BoundingBox ndcBounds;
+	Plane nearPlane = frustum.planes_[PLANE_NEAR];
+	for (int i = 0; i != 8; ++i)
 	{
-		const Matrix3x4& worldTransform = node_->GetWorldTransform();
-		for (unsigned i = 0; i < batches_.Size(); ++i)
-			batches_[i].distance_ = frame.camera_->GetDistance(worldTransform * geometryData_[i].center_);
+		Vector3 cornerWS = voxCorners[i];
+		if (nearPlane.Distance(cornerWS) < 0)
+		{
+			cornerWS = nearPlane.Project(cornerWS);
+		}
+		else
+		{
+			anyBehind = true;
+		}
+		Vector4 cornerSS = frame.camera_->GetProjection() * frame.camera_->GetView() * Vector4(cornerWS, 1.0f);
+		ndcBounds.Merge(Vector3(cornerSS.x_, cornerSS.y_, cornerSS.z_) / cornerSS.w_);
+	}
+	if (!anyBehind)
+	{
+		return 0;
 	}
 
-	float scale = worldBoundingBox.Size().DotProduct(DOT_SCALE);
-	float newLodDistance = frame.camera_->GetLodDistance(distance_, scale, lodBias_);
-
-	if (newLodDistance != lodDistance_)
+	// make sure that part of the voxel is visible w.r.t the other clipping planes
+	bool outside = false;
+	outside |= ndcBounds.max_.x_ < -1;
+	outside |= ndcBounds.max_.y_ < -1;
+	outside |= ndcBounds.max_.z_ < -1;
+	outside |= ndcBounds.min_.x_ > +1;
+	outside |= ndcBounds.min_.y_ > +1;
+	outside |= ndcBounds.min_.z_ > +1;
+	if (outside)
 	{
-		lodDistance_ = newLodDistance;
-		CalculateLodLevels();
+		return 0;
 	}
+
+	// Convert NDC space to pixel space.
+	Vector3 ndcSpan = ndcBounds.max_ - ndcBounds.min_;
+	Vector2 pixBounds(ndcSpan.x_ * frame.viewSize_.x_  * 0.5,
+		ndcSpan.y_ * frame.viewSize_.y_ * 0.5);
+	double pixSize = std::max(pixBounds.x_, pixBounds.y_);
+	if (pixSize <= 0)
+	{
+		return 0;
+	}
+
+	// Check for infinity
+	if (pixSize > std::numeric_limits<double>::max())
+	{
+		return maximumLOD_;
+	}
+
+						   // Calc the actual LOD
+	int lodLevel = 1;
+	while (pixSize > pointSize)
+	{
+		pixSize *= 0.5f;
+		lodLevel++;
+	}
+	return (std::uint8_t)lodLevel;
+}
+
+void AgVoxelContainer::UpdateBatches(const FrameInfo& frame)
+{
+	const float pointSize = node_->GetVar(VoxelTreeRunTimeVars::VAR_POINTSIZE).GetFloat();
+	std::uint8_t currentLod = CalcLOD(frame, pointSize);
+	currentDrawLOD_ = currentLod;//std::max(currentLod, currentDrawLOD_);
 }
 
 std::uint32_t	AgVoxelContainer::getLODPointCount(std::uint8_t lod) const
 {
 	if (lod <= m_currentLODLoaded)
-		return LODInfos_.At(lod).m_amountOfLODPoints;
+		return voxelPointsArr_.At(lod)->getCount();
 	else if (m_currentLODLoaded > 0)   //needs refinement reset to zero
-		return LODInfos_.At(m_currentLODLoaded).m_amountOfLODPoints;
+		return voxelPointsArr_.At(m_currentLODLoaded)->getCount();
 	
 	return 0;
 }
 
-bool AgVoxelContainer::isGeometryEmpty() const
+std::uint64_t	AgVoxelContainer::getAllocatedMemory() const
 {
-	return voxelPoints_ || voxelPoints_->isEmpty();
+	std::uint64_t mem = 0;
+	for (int i = 0; i < voxelPointsArr_.Size(); i ++)
+	{
+		mem += voxelPointsArr_.At(i)->getAllocatedMemory();
+	}
+
+	return mem;
 }
 
 std::uint64_t	AgVoxelContainer::clearGeometry()
 {
-	if (!voxelPoints_)
-		return 0;
-	
-	setClipIndex(0);
-	return voxelPoints_->clear();
+	std::uint64_t mem = 0;
+	for (int i = 0; i < voxelPointsArr_.Size(); i++)
+	{
+		mem += voxelPointsArr_.At(i)->clear();
+	}
+	voxelPointsArr_.Clear();
+	return mem;
 }
-
-std::uint64_t	AgVoxelContainer::getAllocatedMemory() const
-{
-	if (!voxelPoints_)
-		return 0;
-
-	return voxelPoints_->getAllocatedMemory();
-}
-
 
 bool AgVoxelContainer::isClipFlag(ClipFlag rhs) const
 {
@@ -135,8 +208,14 @@ void AgVoxelContainer::OnWorldBoundingBoxUpdate()
 
 void AgVoxelContainer::SetVoxelPoints(AgVoxelPoints* points)
 {
-	if (points == voxelPoints_)
+	if (!points)
 		return;
+
+	for (int i = 0; i < voxelPointsArr_.Size(); i++)
+	{
+		if (voxelPointsArr_.At(i) == points)
+			return;
+	}
 
 	if (!node_)
 	{
@@ -145,10 +224,24 @@ void AgVoxelContainer::SetVoxelPoints(AgVoxelPoints* points)
 	}
 
 	// Unsubscribe from the reload event of previous model (if any), then subscribe to the new
-	if (voxelPoints_)
-		UnsubscribeFromEvent(voxelPoints_, E_RELOADFINISHED);
+	/*if (voxelPoints_)
+		UnsubscribeFromEvent(voxelPoints_, E_RELOADFINISHED);*/
 
-	voxelPoints_ = points;
+	voxelPointsArr_.Push(points);
+
+	SourceBatch srcBatch;
+	srcBatch.geometry_ = points->getGeometry();
+	srcBatch.worldTransform_ = node_ ? &node_->GetWorldTransform() : nullptr;
+
+	const ResourceRef& resRef = node_->GetVar(VoxelTreeRunTimeVars::VAR_MATERIAL).GetResourceRef();
+	auto* cache = GetSubsystem<ResourceCache>();
+	srcBatch.material_ = cache->GetResource<Material>(resRef.name_);
+	if (srcBatch.material_)
+	{
+		const float pointSize = node_->GetVar(VoxelTreeRunTimeVars::VAR_POINTSIZE).GetFloat();
+		srcBatch.material_->SetShaderParameter("PointSize", pointSize);
+	}
+	batches_.Push(srcBatch);
 
 	//if (geometry)
 	//{
@@ -177,84 +270,26 @@ void AgVoxelContainer::SetVoxelPoints(AgVoxelPoints* points)
 	MarkNetworkUpdate();
 }
 
-ResourceRef AgVoxelContainer::GetVoxelPointsAttr() const
+void AgVoxelContainer::loadLODInternal(bool isLidarData, std::uint8_t lodLevel)
 {
-	return GetResourceRef(GetVoxelPoints(), node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool() ? AgVoxelLidarPoints::GetTypeStatic() : AgVoxelTerrestialPoints::GetTypeStatic());
-}
+	if (resourceName_.Empty())
+		return;
 
-void AgVoxelContainer::SetVoxelPointsAttr(const ResourceRef& value)
-{
-	//SubscribeToEvent(E_RESOURCEBACKGROUNDLOADED, URHO3D_HANDLER(AgVoxelContainer, HandleResourceBackgroundLoaded));
+	if (lodLevel > maximumLOD_)
+		lodLevel = maximumLOD_;
 
+	SubscribeToEvent(E_RESOURCEBACKGROUNDLOADED, URHO3D_HANDLER(AgVoxelContainer, HandleResourceBackgroundLoaded));
+
+	const unsigned oldLod = voxelPointsArr_.Size();
 	auto* cache = GetSubsystem<ResourceCache>();
-	if (node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool())
-		SetVoxelPoints(cache->GetResourceWithoutLoad<AgVoxelLidarPoints>(value.name_));
-	else
-		SetVoxelPoints(cache->GetResourceWithoutLoad<AgVoxelTerrestialPoints>(value.name_));
-}
-
-int AgVoxelContainer::GetAmountOfOctreeNodes(std::uint8_t lod) const
-{
-	return LODInfos_.At(lod).m_amountOfOctreeNodes;
-}
-
-int AgVoxelContainer::GetAmountOfLODPoints(std::uint8_t lod) const
-{
-	return LODInfos_.At(lod).m_amountOfLODPoints;
-}
-
-/// Get wheel data attribute for serialization.
-VariantVector AgVoxelContainer::GetLODInfoAttr() const
-{
-	VariantVector ret;
-
-	ret.Reserve(LODInfos_.Size() * 2);
-	for (unsigned i = 0; i < LODInfos_.Size(); i++)
+	for (unsigned i = oldLod; i < (unsigned)lodLevel; i ++)
 	{
-		ret.Push(LODInfos_.At(i).m_amountOfOctreeNodes);
-		ret.Push(LODInfos_.At(i).m_amountOfLODPoints);
+		String fileName = resourceName_ + "_" + Urho3D::String(i) + ".vxl";
+		if(isLidarData)
+			cache->BackgroundLoadResource<AgVoxelLidarPoints>(fileName, true, nullptr, id_);
+		else
+			cache->BackgroundLoadResource<AgVoxelTerrestialPoints>(fileName, true, nullptr, id_);
 	}
-	return ret;
-}
-
-/// Set wheel data attribute during loading.
-void AgVoxelContainer::SetLODInfoAttr(const VariantVector& value)
-{
-	LODInfos_.Clear();
-	for (unsigned i = 0; i < value.Size() / 2; i ++)
-	{
-		VoxelLODInfo lod;
-		lod.m_amountOfOctreeNodes = value.At(2 * i).GetInt();
-		lod.m_amountOfLODPoints = value.At(2 * i + 1).GetInt();
-		LODInfos_.Push(lod);
-	}
-}
-
-void AgVoxelContainer::loadLODInternal(bool isLidarData, int lodLevel, bool lock)
-{
-	int amountOfPoints = GetAmountOfLODPoints(lodLevel);
-	if (amountOfPoints <= 0)
-		return;
-	//only stream in additional points
-	int oldPoints = 0;
-	int startLod = 0;
-	if (m_currentLODLoaded > 0) //only load in additional data, not starting from beginning!
-	{
-		oldPoints = GetAmountOfLODPoints(m_currentLODLoaded);
-		startLod = m_currentLODLoaded;
-	}
-	m_numOldPoints = oldPoints;
-
-	//new points to be streamed in
-	int pointsToBeStreamedIn = amountOfPoints - oldPoints;
-	if (pointsToBeStreamedIn <= 0)
-		return;
-
-	if (!voxelPoints_)
-		return;
-
-	auto* cache = GetSubsystem<ResourceCache>();
-	cache->BackgroundLoadPatchResource<AgVoxelPoints>(voxelPoints_->GetName(), oldPoints, pointsToBeStreamedIn, true, nullptr, id_);
 }
 
 void AgVoxelContainer::HandleResourceBackgroundLoaded(StringHash eventType, VariantMap& eventData)
@@ -381,9 +416,9 @@ std::vector<int> AgVoxelContainer::getVisibleNodeIndices()
 	return allVisibleNodeIndices;
 }*/
 
-bool AgVoxelContainer::isComplete(int LOD) const
+bool AgVoxelContainer::isComplete(unsigned lod) const
 {
-	return GetAmountOfLODPoints(LOD) <= GetAmountOfLODPoints(m_currentLODLoaded);
+	return lod <= voxelPointsArr_.Size();
 }
 
 //bool AgVoxelContainer::LoadJSON(const JSONValue& source)
@@ -439,3 +474,36 @@ bool AgVoxelContainer::isComplete(int LOD) const
 //
 //	return true;
 //}
+
+void AgVoxelContainer::HandleUpdate(StringHash eventType, VariantMap& eventData)
+{
+	const bool isLidarData = node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool();
+	const int oldLod = voxelPointsArr_.Size();
+	if (!voxelPointsArr_.Empty() && (oldLod - (int)currentDrawLOD_ > 3))
+	{
+		for (unsigned i = currentDrawLOD_; i < oldLod; i++)
+		{
+			batches_.Pop();
+			AgVoxelPoints* points = voxelPointsArr_.Back();
+			voxelPointsArr_.Pop();
+			auto* cache = GetSubsystem<ResourceCache>();
+			if (isLidarData)
+				cache->ReleaseResource<AgVoxelLidarPoints>(points->GetName(), /*force*/true);//TODO
+			else
+				cache->ReleaseResource<AgVoxelTerrestialPoints>(points->GetName(), /*force*/true);
+		}
+	}
+	//reset
+	currentDrawLOD_ = 0;
+	
+}
+
+void AgVoxelContainer::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
+{
+	const bool isLidarData = node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool();
+	const int oldLod = voxelPointsArr_.Size();
+	if (currentDrawLOD_ > oldLod)
+	{
+		loadLODInternal(isLidarData, oldLod + 1);
+	}	
+}
