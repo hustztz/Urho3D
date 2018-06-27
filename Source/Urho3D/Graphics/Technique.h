@@ -57,6 +57,8 @@ public:
     void SetLightingMode(PassLightingMode mode);
     /// Set depth write on/off.
     void SetDepthWrite(bool enable);
+	/// Set line antialiasing on/off. Has effect only on models that consist of line lists.
+	void SetEnablePointSize(bool enable);
     /// Set alpha-to-coverage on/off.
     void SetAlphaToCoverage(bool enable);
     /// Set whether requires desktop level hardware.
@@ -101,6 +103,9 @@ public:
 
     /// Return depth write mode.
     bool GetDepthWrite() const { return depthWrite_; }
+
+	/// Return whether line antialiasing is enabled.
+	bool EnablePointSize() const { return enablePointSize_; }
 
     /// Return alpha-to-coverage mode.
     bool GetAlphaToCoverage() const { return alphaToCoverage_; }
@@ -155,7 +160,9 @@ private:
     /// Last shaders loaded frame number.
     unsigned shadersLoadedFrameNumber_;
     /// Depth write mode.
-    bool depthWrite_;
+	bool depthWrite_;
+	/// Line antialiasing flag.
+	bool enablePointSize_;
     /// Alpha-to-coverage mode.
     bool alphaToCoverage_;
     /// Require desktop level hardware flag.

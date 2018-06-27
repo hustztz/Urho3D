@@ -62,10 +62,9 @@
 #include <common/RCMemoryHelper.h>
 #include <common/RCMemoryMapFile.h>
 
-#include <Urho3D/PointCloud/AgOctreeDefinitions.h>
 #include <Urho3D/PointCloud/AgVoxelLidarPoints.h>
 #include <Urho3D/PointCloud/AgVoxelTerrestialPoints.h>
-#include <Urho3D/PointCloud/AgPointCloudEngine.h>
+#include <Urho3D/PointCloud/AgPointCloudOptions.h>
 
 using namespace Urho3D;
 
@@ -307,13 +306,13 @@ bool ExportPointCloudFile(const String& inputName, const String& outPath)
 		return false;
 	}
 
-	SharedPtr<Scene> outScene(new Scene(context_));
-	AgPointCloudEngine* pointCloudEngine = outScene->CreateComponent<AgPointCloudEngine>();
+	SharedPtr<Node> rootNode(new Node(context_));
+	AgPointCloudOptions* pointCloudEngine = rootNode->CreateComponent<AgPointCloudOptions>();
 
 	Vector3 sceneOffset = Vector3((float)fileHeader.m_translation.x, (float)fileHeader.m_translation.y, (float)fileHeader.m_translation.z);
 	pointCloudEngine->setOffset(sceneOffset);
 
-	Node* pNode = outScene->CreateChild("PointCloud");
+	Node* pNode = rootNode->CreateChild("PointCloud");
 	pNode->SetPosition(Vector3((float)fileHeader.m_translation.x, (float)fileHeader.m_translation.y, (float)fileHeader.m_translation.z) - sceneOffset);
 	pNode->SetRotation(Quaternion((float)fileHeader.m_rotation.x, (float)fileHeader.m_rotation.y, (float)fileHeader.m_rotation.z));
 	pNode->SetScale(Vector3((float)fileHeader.m_scale.x, (float)fileHeader.m_scale.y, (float)fileHeader.m_scale.z));
@@ -328,6 +327,8 @@ bool ExportPointCloudFile(const String& inputName, const String& outPath)
 	pNode->SetVar(VoxelTreeRunTimeVars::VAR_HASRGB, Variant(fileHeader.mHasRGB));
 	pNode->SetVar(VoxelTreeRunTimeVars::VAR_HASNORMALS, Variant(fileHeader.mHasNormals));
 	pNode->SetVar(VoxelTreeRunTimeVars::VAR_HASINTENSITY, Variant(fileHeader.mHasIntensity));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_POINTSIZE, Variant(5.0f));
+	pNode->SetVar(VoxelTreeRunTimeVars::VAR_MATERIAL, Variant(ResourceRef(Material::GetTypeStatic(), "E:\\Projects\\V8\\Urho3D\\bin\\Data\\Materials\\PointCloud.xml")));
 
 	pNode->SetVar(VoxelTreeRunTimeVars::VAR_SVOBOUNDSMIN, Variant(Vector3((float)fileHeader.m_svoBounds.getMin().x, (float)fileHeader.m_svoBounds.getMin().y, (float)fileHeader.m_svoBounds.getMin().z)));
 	pNode->SetVar(VoxelTreeRunTimeVars::VAR_SVOBOUNDSMAX, Variant(Vector3((float)fileHeader.m_svoBounds.getMax().x, (float)fileHeader.m_svoBounds.getMax().y, (float)fileHeader.m_svoBounds.getMax().z)));
@@ -454,21 +455,19 @@ bool ExportPointCloudFile(const String& inputName, const String& outPath)
 				runTimeLod->SetSVOBoundsMin(Vector3((float)curLeaf.m_svoBounds.getMin().x, (float)curLeaf.m_svoBounds.getMin().y, (float)curLeaf.m_svoBounds.getMin().z));
 				runTimeLod->SetSVOBoundsMax(Vector3((float)curLeaf.m_svoBounds.getMax().x, (float)curLeaf.m_svoBounds.getMax().y, (float)curLeaf.m_svoBounds.getMax().z));
 				runTimeLod->SetAmountOfPoints( curLeaf.m_amountOfPoints );
+				runTimeLod->SetMaxLOD( (char)curLeaf.m_maxDepth );
+				Urho3D::String resourceName = outPath + Urho3D::String(i);
+				runTimeLod->SetResourceName(resourceName);
 
 				int cumLeafPoints = 0;
 				int cumNodePoints = 0;
 
-				VariantVector LODInfo;
 				for (int j = 0; j < curLeaf.m_maxDepth; j++)
 				{
 					//cumulative stuff
 					cumLeafPoints += curLeaf.m_numLeafNodes[j];
 					cumNodePoints += curLeaf.m_numLeafNodes[j] + curLeaf.m_numNonLeafNodes[j];
-
-					LODInfo.Push(curLeaf.m_numLeafNodes[j] + curLeaf.m_numNonLeafNodes[j]);
-					LODInfo.Push(curLeaf.m_numNonLeafNodes[j] + cumLeafPoints);
 				}
-				runTimeLod->SetLODInfoAttr(LODInfo);
 
 				//////
 				int pointSizeInBytes = sizeof(AgVoxelLeafNode)     * cumLeafPoints;
@@ -477,42 +476,58 @@ bool ExportPointCloudFile(const String& inputName, const String& outPath)
 				//runTimeLod->m_nodeOffsetStart = cumulativeOffset + nodeDataChunk.m_fileOffsetStart;
 				std::uint64_t pointDataOffsetStart = cumulativeOffset + nodeSizeInBytes + nodeDataChunk.m_fileOffsetStart;
 				//runTimeLod->m_umbrellaNodeOffsetStart = cumulativeUmbrellaOffset;
-				if (pointSizeInBytes > 0)
+				int cumLeafPoints_2 = 0;
+				unsigned oldNumAllPoints = 0;
+				for (int j = 0; j < curLeaf.m_maxDepth; j++)
 				{
-					File resourcefile(context_);
-					Urho3D::String resourceName = outPath + Urho3D::String(i) + ".vxl";
-					if (resourcefile.Open(resourceName, FILE_WRITE))
-					{
-						if (resourcefile.WriteFileID("PCVL"))
-						{
-							resourcefile.WriteUInt((unsigned)cumLeafPoints);
+					cumLeafPoints_2 += curLeaf.m_numLeafNodes[j];
+					unsigned numAllPoints = curLeaf.m_numNonLeafNodes[j] + cumLeafPoints_2;
+					if (numAllPoints <= oldNumAllPoints)
+						continue;
+					unsigned numPoints = numAllPoints - oldNumAllPoints;
+					oldNumAllPoints = numAllPoints;
 
-							std::vector<AgVoxelLeafNode> rawPoints(pointSizeInBytes);
+					if(0 == numPoints)
+						continue;
+
+					int pointSizeInBytes = sizeof(AgVoxelLeafNode)     * numPoints;
+
+					File voxelFile(context_);
+					const Urho3D::String outFileName = resourceName + "_" + Urho3D::String(j) + ".vxl";
+					if (voxelFile.Open(outFileName, FILE_WRITE))
+					{
+						if (voxelFile.WriteFileID("PCVL"))
+						{
+							voxelFile.WriteVector3(Vector3((float)curLeaf.m_svoBounds.getMin().x, (float)curLeaf.m_svoBounds.getMin().y, (float)curLeaf.m_svoBounds.getMin().z));
+							voxelFile.WriteUInt(numPoints);
+							std::vector<AgVoxelLeafNode> rawPoints(numPoints);
 							memmapFile.setFilePointer(pointDataOffsetStart);
 							memmapFile.readFile(&rawPoints[0], pointSizeInBytes);
 
-							resourcefile.Write(&rawPoints[0], pointSizeInBytes);
+							voxelFile.Write(&rawPoints[0], pointSizeInBytes);
 
 							if (foundTimeStampChunk && timeStampOffset > 0)
 							{
 								std::vector<double> timeStampData;
-								timeStampData.resize(cumLeafPoints);
+								timeStampData.resize(numPoints);
 								memmapFile.setFilePointer(timeStampOffset);
-								memmapFile.readFile(&timeStampData[0], sizeof(double) * cumLeafPoints);
+								memmapFile.readFile(&timeStampData[0], sizeof(double) * numPoints);
 
-								resourcefile.Write(&timeStampData[0], sizeof(double) * cumLeafPoints);
+								voxelFile.Write(&timeStampData[0], sizeof(double) * numPoints);
 
-								timeStampOffset += sizeof(double) * runTimeLod->GetAmountOfPoints();
+								timeStampOffset += sizeof(double) * numPoints;
 							}
 
-							runTimeLod->SetVoxelPointsAttr(ResourceRef(isLidarData ? AgVoxelLidarPoints::GetTypeStatic() : AgVoxelTerrestialPoints::GetTypeStatic(), resourceName));
+							//runTimeLod->SetVoxelPointsAttr(ResourceRef(isLidarData ? AgVoxelLidarPoints::GetTypeStatic() : AgVoxelTerrestialPoints::GetTypeStatic(), resourceName));
 						}
 					}
-					resourcefile.Close();
+					voxelFile.Close();
+
+					pointDataOffsetStart += pointSizeInBytes;
 				}
 
 				//update cumulative offset
-				cumulativeOffset += (pointSizeInBytes + nodeSizeInBytes);
+				cumulativeOffset += (sizeof(AgVoxelLeafNode)  * cumLeafPoints + nodeSizeInBytes);
 				cumulativeUmbrellaOffset += sizeof(OctreeLeafSaveData);
 
 			}
@@ -528,11 +543,11 @@ bool ExportPointCloudFile(const String& inputName, const String& outPath)
 	if (!file.Open(outName + ".xml", FILE_WRITE))
 		ErrorExit("Could not open output file " + outName);
 	if (saveBinary_)
-		outScene->Save(file);
+		rootNode->Save(file);
 	else if (saveJson_)
-		outScene->SaveJSON(file);
+		rootNode->SaveJSON(file);
 	else
-		outScene->SaveXML(file);
+		rootNode->SaveXML(file);
 	return true;
 }
 

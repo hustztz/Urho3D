@@ -81,6 +81,7 @@ Pass::Pass(const String& name) :
     shadersLoadedFrameNumber_(0),
     alphaToCoverage_(false),
     depthWrite_(true),
+	enablePointSize_(true),
     isDesktop_(false)
 {
     name_ = name.ToLower();
@@ -119,6 +120,11 @@ void Pass::SetLightingMode(PassLightingMode mode)
 void Pass::SetDepthWrite(bool enable)
 {
     depthWrite_ = enable;
+}
+
+void Pass::SetEnablePointSize(bool enable)
+{
+	enablePointSize_ = enable;
 }
 
 void Pass::SetAlphaToCoverage(bool enable)
@@ -346,6 +352,9 @@ bool Technique::BeginLoad(Deserializer& source)
             if (passElem.HasAttribute("depthwrite"))
                 newPass->SetDepthWrite(passElem.GetBool("depthwrite"));
 
+			if (passElem.HasAttribute("enablePointSize"))
+				newPass->SetEnablePointSize(passElem.GetBool("enablePointSize"));
+
             if (passElem.HasAttribute("alphatocoverage"))
                 newPass->SetAlphaToCoverage(passElem.GetBool("alphatocoverage"));
         }
@@ -391,6 +400,7 @@ SharedPtr<Technique> Technique::Clone(const String& cloneName) const
         newPass->SetDepthTestMode(srcPass->GetDepthTestMode());
         newPass->SetLightingMode(srcPass->GetLightingMode());
         newPass->SetDepthWrite(srcPass->GetDepthWrite());
+		newPass->SetEnablePointSize(srcPass->EnablePointSize());
         newPass->SetAlphaToCoverage(srcPass->GetAlphaToCoverage());
         newPass->SetIsDesktop(srcPass->IsDesktop());
         newPass->SetVertexShader(srcPass->GetVertexShader());
