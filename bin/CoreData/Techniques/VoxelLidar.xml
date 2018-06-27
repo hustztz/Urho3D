@@ -1,3 +1,4 @@
-<technique vs="SplatLidar" ps="SplatLidar" vsdefines="VERTEXCOLOR SOFTPARTICLES" psdefines="VERTEXCOLOR">
-    <pass name="base" enablePointSize="true"/>
+<technique vs="SplatLidar" ps="SplatLidar">
+    <pass name="base" enablePointSize="true" vsdefines="ADAPTIVESIZE HASNORMAL" psdefines="HASNORMAL" />
+	<pass name="depth" enablePointSize="true" vsdefines="DEPTHTARGET" psdefines="DEPTHTARGET" />
 </technique>

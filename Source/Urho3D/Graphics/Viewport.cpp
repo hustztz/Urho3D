@@ -30,6 +30,7 @@
 #include "../Resource/ResourceCache.h"
 #include "../Resource/XMLFile.h"
 #include "../Scene/Scene.h"
+#include "../IO/Log.h"
 
 #include "../DebugNew.h"
 
@@ -212,4 +213,18 @@ void Viewport::AllocateView()
     view_ = new View(context_);
 }
 
+void Viewport::AddFilter(Filter* filter)
+{
+
+	HashMap<String, SharedPtr<Filter> >::Iterator iter = filters_.Find(filter->GetTypeName());
+	if (iter == filters_.End())
+	{
+		filters_.Insert(MakePair(filter->GetTypeName(), SharedPtr<Filter>(filter)));
+		filter->SetEnable(true);
+	}
+	else
+	{
+		URHO3D_LOGINFO("ViewPort has contained" + filter->GetTypeName());
+	}
+}
 }

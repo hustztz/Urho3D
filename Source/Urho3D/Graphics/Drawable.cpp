@@ -1,4 +1,4 @@
-//
+﻿//
 
 // Copyright (c) 2008-2018 the Urho3D project.
 //
@@ -417,6 +417,83 @@ void Drawable::RemoveFromOctree()
 
         octant_->RemoveDrawable(this);
     }
+}
+Pass* Drawable::AddPass(const String& passName, const String& vsName, const String& psName, const String& vsDefines, const String& psDefines)
+{
+	return AddPass(0, passName, vsName, psName, vsDefines, psDefines);
+}
+
+Pass* Drawable::AddPass(unsigned int index, const String& passName, const String& vsName, const String& psName, const String& vsDefines, const String& psDefines)
+{
+	if (index >= batches_.Size())
+	{
+		URHO3D_LOGERROR("When Adding a pass£¬Material index out of bounds");
+		return nullptr;
+	}
+	if (batches_[index].addPassNames_.Contains(passName))
+	{
+		URHO3D_LOGDEBUG("Have containing this pass"); //自己加的pass名字应该区别开
+		return nullptr;
+	}
+
+	if (batches_[index].addPassNames_.Size() == 0)
+	{
+		if (batches_[index].material_)
+		{
+			batches_[index].oldMaterial_ = batches_[index].material_;
+			batches_[index].material_ = batches_[index].oldMaterial_->Clone();
+			batches_[index].oldTechnique_ = batches_[index].oldMaterial_->GetTechnique(0);
+			batches_[index].material_->SetTechnique(0, batches_[index].oldMaterial_->GetTechnique(0)->Clone());
+		}
+		else
+		{
+			batches_[index].oldMaterial_ = nullptr;
+			batches_[index].material_ = node_->GetSubsystem<Renderer>()->GetDefaultMaterial()->Clone();
+			batches_[index].oldTechnique_ = nullptr;
+			batches_[index].material_->SetTechnique(0, batches_[index].material_->GetTechnique(0)->Clone());
+		}
+	}
+	auto* pass = batches_[index].material_->GetTechnique(0)->CreatePass(passName);
+	pass->SetVertexShader(vsName);
+	pass->SetPixelShader(psName);
+	pass->SetVertexShaderDefines(vsDefines);
+	pass->SetPixelShaderDefines(psDefines);
+
+	batches_[index].addPassNames_.Insert(passName);
+
+	return pass;
+}
+
+bool Drawable::RemovePass(const String& passName)
+{
+	return RemovePass(0, passName);
+}
+
+bool Drawable::RemovePass(unsigned int index, const String& passName)
+{
+	if (index >= batches_.Size())
+	{
+		URHO3D_LOGERROR("When removing a pass£¬Material index out of bounds");
+		return false;
+	}
+	if (batches_[index].addPassNames_.Size() == 0)
+		return true;
+	batches_[index].addPassNames_.Erase(passName);
+	batches_[index].material_->GetTechnique(0)->RemovePass(passName);
+	if (batches_[index].addPassNames_.Size() == 0)
+	{
+		if (batches_[index].oldMaterial_)
+		{
+			batches_[index].material_ = batches_[index].oldMaterial_;
+			batches_[index].oldMaterial_ = nullptr;
+			batches_[index].oldTechnique_ = nullptr;
+		}
+		else
+		{
+			batches_[index].material_ = nullptr;
+		}
+	}
+	return true;
 }
 
 bool WriteDrawablesToOBJ(PODVector<Drawable*> drawables, File* outputFile, bool asZUp, bool asRightHanded, bool writeLightmapUV)

@@ -188,7 +188,7 @@ void CheckVisibilityWork(const WorkItem* item, unsigned threadIndex)
             drawable->MarkInView(view->frame_);
 
             // For geometries, find zone, clear lights and calculate view space Z range
-            if (drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY)
+            if ((drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY) || (drawable->GetDrawableFlags() & DRAWABLE_POINTCLOUD))
             {
                 Zone* drawableZone = drawable->GetZone();
                 if (!cameraZoneOverride &&
@@ -794,7 +794,7 @@ void View::GetDrawables()
     // Get zones and occluders first
     {
         ZoneOccluderOctreeQuery
-            query(tempDrawables, cullCamera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_ZONE, cullCamera_->GetViewMask());
+            query(tempDrawables, cullCamera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_ZONE | DRAWABLE_POINTCLOUD, cullCamera_->GetViewMask());
         octree_->GetDrawables(query);
     }
 
@@ -865,12 +865,12 @@ void View::GetDrawables()
     if (occlusionBuffer_)
     {
         OccludedFrustumOctreeQuery query
-            (tempDrawables, cullCamera_->GetFrustum(), occlusionBuffer_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask());
+            (tempDrawables, cullCamera_->GetFrustum(), occlusionBuffer_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT | DRAWABLE_POINTCLOUD, cullCamera_->GetViewMask());
         octree_->GetDrawables(query);
     }
     else
     {
-        FrustumOctreeQuery query(tempDrawables, cullCamera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, cullCamera_->GetViewMask());
+        FrustumOctreeQuery query(tempDrawables, cullCamera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_LIGHT | DRAWABLE_POINTCLOUD, cullCamera_->GetViewMask());
         octree_->GetDrawables(query);
     }
 

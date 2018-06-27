@@ -23,6 +23,7 @@
 #pragma once
 
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/Technique.h"
 #include "../Math/BoundingBox.h"
 #include "../Scene/Component.h"
 
@@ -34,6 +35,7 @@ static const unsigned DRAWABLE_GEOMETRY = 0x1;
 static const unsigned DRAWABLE_LIGHT = 0x2;
 static const unsigned DRAWABLE_ZONE = 0x4;
 static const unsigned DRAWABLE_GEOMETRY2D = 0x8;
+static const unsigned DRAWABLE_POINTCLOUD = 0x10;
 static const unsigned DRAWABLE_ANY = 0xff;
 static const unsigned DEFAULT_VIEWMASK = M_MAX_UNSIGNED;
 static const unsigned DEFAULT_LIGHTMASK = M_MAX_UNSIGNED;
@@ -53,6 +55,7 @@ class RayOctreeQuery;
 class Zone;
 struct RayQueryResult;
 struct WorkItem;
+class Pass;
 
 /// Geometry update type.
 enum UpdateGeometryType
@@ -102,6 +105,10 @@ struct URHO3D_API SourceBatch
     void* instancingData_{};
     /// %Geometry type.
     GeometryType geometryType_{GEOM_STATIC};
+
+	HashSet<String> addPassNames_;
+	SharedPtr<Material> oldMaterial_;
+	SharedPtr<Technique> oldTechnique_;
 };
 
 /// Base class for visible components.
@@ -301,6 +308,11 @@ public:
     {
         vertexLights_.Push(light);
     }
+
+	Pass* AddPass(const String& passName, const String& vsName, const String& psName, const String& vsDefines = "", const String& psDefines = "");
+	Pass* AddPass(unsigned int index, const String& passName, const String& vsName, const String& psName, const String& vsDefines = "", const String& psDefines = "");
+	bool RemovePass(const String& passName);
+	bool RemovePass(unsigned int index, const String& passName);
 
 protected:
     /// Handle node being assigned.

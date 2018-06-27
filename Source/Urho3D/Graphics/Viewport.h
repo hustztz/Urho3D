@@ -27,6 +27,7 @@
 #include "../Math/Ray.h"
 #include "../Math/Rect.h"
 #include "../Math/Vector2.h"
+#include "../Filter/Filter.h"
 
 namespace Urho3D
 {
@@ -96,6 +97,10 @@ public:
     /// Allocate the view structure. Called by Renderer.
     void AllocateView();
 
+	void AddFilter(Filter* filter);
+
+	template<class T> T* GetFilter();
+
 private:
     /// Scene pointer.
     WeakPtr<Scene> scene_;
@@ -111,6 +116,8 @@ private:
     SharedPtr<View> view_;
     /// Debug draw flag.
     bool drawDebug_;
+
+	HashMap<String, SharedPtr<Filter> > filters_;
 };
 
 }
