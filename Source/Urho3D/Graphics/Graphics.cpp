@@ -44,6 +44,7 @@
 #include "../Graphics/Technique.h"
 #include "../Graphics/Terrain.h"
 #include "../Graphics/TerrainPatch.h"
+#include "../Graphics/LodModel.h"
 #ifdef _WIN32
 #include "../Graphics/Texture2D.h"
 #endif
@@ -51,6 +52,10 @@
 #include "../Graphics/Texture3D.h"
 #include "../Graphics/TextureCube.h"
 #include "../Graphics/Zone.h"
+#include "../PointCloud/AgVoxelContainer.h"
+#include "../PointCloud/AgVoxelLidarPoints.h"
+#include "../PointCloud/AgVoxelTerrestialPoints.h"
+#include "../PointCloud/AgPointCloudOptions.h"
 #include "../IO/FileSystem.h"
 #include "../IO/Log.h"
 
@@ -402,6 +407,7 @@ void RegisterGraphicsLibrary(Context* context)
     Animation::RegisterObject(context);
     Material::RegisterObject(context);
     Model::RegisterObject(context);
+	LodModel::RegisterObject(context);
     Shader::RegisterObject(context);
     Technique::RegisterObject(context);
     Texture2D::RegisterObject(context);
@@ -427,6 +433,10 @@ void RegisterGraphicsLibrary(Context* context)
     DebugRenderer::RegisterObject(context);
     Octree::RegisterObject(context);
     Zone::RegisterObject(context);
+	ambergris::PointCloudEngine::AgVoxelContainer::RegisterObject(context);
+	ambergris::PointCloudEngine::AgVoxelLidarPoints::RegisterObject(context);
+	ambergris::PointCloudEngine::AgVoxelTerrestialPoints::RegisterObject(context);
+	ambergris::PointCloudEngine::AgPointCloudOptions::RegisterObject(context);
 }
 
 }

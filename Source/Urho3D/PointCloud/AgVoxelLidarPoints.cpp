@@ -1,5 +1,5 @@
 #include "AgVoxelLidarPoints.h"
-#include "AgOctreeDefinitions.h"
+#include "AgPointCloudOptions.h"
 
 #include "../Core/Context.h"
 #include "../IO/Log.h"
@@ -10,7 +10,6 @@
 #include <algorithm>
 
 using namespace Urho3D;
-using namespace ambergris::RealityComputing::Common;
 using namespace ambergris::PointCloudEngine;
 
 AgVoxelLidarPoints::AgVoxelLidarPoints(Context* context) :
@@ -47,7 +46,7 @@ bool AgVoxelLidarPoints::BeginLoad(Deserializer& source)
 		std::uint64_t data1 = source.ReadUInt64();
 		std::uint64_t data2 = source.ReadUInt64();
 		AgVoxelLeafNode rawPoint(data1, data2);
-		m_lidarPointList[i].setRawCoord(rawPoint.getRawOffsetFromBoundingBox() * 0.001f + RCVector3f(offset.x_, offset.y_, offset.z_));
+		m_lidarPointList[i].setRawCoord(rawPoint.getRawOffsetFromBoundingBox() * 0.001f + Vector3(offset.x_, offset.y_, offset.z_));
 		m_lidarPointList[i].setRGBA(rawPoint.getRGBA());
 		m_lidarPointList[i].setNormalIndex(rawPoint.getNormal());
 		m_lidarPointList[i].setLidarClassification(rawPoint.getLidarClassification());
@@ -75,7 +74,7 @@ bool AgVoxelLidarPoints::EndLoad()
 	PODVector<VertexElement> elements;
 	elements.Push(VertexElement(TYPE_VECTOR3, SEM_POSITION));
 	elements.Push(VertexElement(TYPE_UBYTE4_NORM, SEM_COLOR));
-	elements.Push(VertexElement(TYPE_INT, SEM_TEXCOORD));
+	elements.Push(VertexElement(TYPE_INT, SEM_OBJECTINDEX));
 
 	// Upload vertex buffer data
 	if(!vertexBuffers_)

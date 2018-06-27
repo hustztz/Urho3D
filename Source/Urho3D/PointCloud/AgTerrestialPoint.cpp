@@ -1,8 +1,7 @@
 #include "AgTerrestialPoint.h"
+#include "AgPointCloudNormalUtils.h"
 
-#include <common/RCVector.h>
-
-using namespace ambergris::RealityComputing::Common;
+using namespace Urho3D;
 using namespace ambergris::PointCloudEngine;
 
 
@@ -11,26 +10,26 @@ AgTerrestialPoint::AgTerrestialPoint()
 	m_data[0] = m_data[1] = m_data[2] = 0;
 }
 
-RCVector3f AgTerrestialPoint::getRawCoord() const
+Vector3 AgTerrestialPoint::getRawCoord() const
 {
 	int x, y, z;
 	x = m_data[0] & 0xFFF;
 	y = (m_data[0] >> 12) & 0xFFF;
 	z = (m_data[1]) & 0xFFF;
 
-	RCVector3f coord;
-	coord.x = static_cast<float>(x);
-	coord.y = static_cast<float>(y);
-	coord.z = static_cast<float>(z);
+	Vector3 coord;
+	coord.x_ = static_cast<float>(x);
+	coord.y_ = static_cast<float>(y);
+	coord.z_ = static_cast<float>(z);
 
 	return coord;
 }
 
-void AgTerrestialPoint::setRawCoord(const RCVector3f& val)
+void AgTerrestialPoint::setRawCoord(const Vector3& val)
 {
-	uint32_t offsetX = (uint32_t)val.x;
-	uint32_t offsetY = (uint32_t)val.y;
-	uint32_t offsetZ = (uint32_t)val.z;
+	uint32_t offsetX = (uint32_t)val.x_;
+	uint32_t offsetY = (uint32_t)val.y_;
+	uint32_t offsetZ = (uint32_t)val.z_;
 
 	m_data[0] &= ~(0xFFF);        //clear x-coord bits
 	m_data[0] |= offsetX;           //x coord bits
@@ -42,31 +41,31 @@ void AgTerrestialPoint::setRawCoord(const RCVector3f& val)
 	m_data[1] |= offsetZ;           //z coord bits
 }
 
-RCVector4ub AgTerrestialPoint::getRGBA() const
+AgCompactColor AgTerrestialPoint::getRGBA() const
 {
-	RCVector4ub rgba;
+	AgCompactColor rgba;
 
-	rgba.x = (m_data[2] >> 24) & 0xFF;
-	rgba.y = (m_data[2] >> 16) & 0xFF;
-	rgba.z = (m_data[2] >> 8) & 0xFF;
-	rgba.w = (m_data[2] >> 0) & 0xFF;
+	rgba.r_ = (m_data[2] >> 24) & 0xFF;
+	rgba.g_ = (m_data[2] >> 16) & 0xFF;
+	rgba.b_ = (m_data[2] >> 8) & 0xFF;
+	rgba.a_ = (m_data[2] >> 0) & 0xFF;
 
 	return rgba;
 }
 
-void AgTerrestialPoint::setRGBA(const RCVector4ub& val)
+void AgTerrestialPoint::setRGBA(const AgCompactColor& val)
 {
 	m_data[2] = 0;      //reset
-	m_data[2] |= (val.x << 24);
-	m_data[2] |= (val.y << 16);
-	m_data[2] |= (val.z << 8);
-	m_data[2] |= (val.w << 0);
+	m_data[2] |= (val.r_ << 24);
+	m_data[2] |= (val.g_ << 16);
+	m_data[2] |= (val.b_ << 8);
+	m_data[2] |= (val.a_ << 0);
 
 }
 
-RCVector3f AgTerrestialPoint::getNormal() const
+Vector3 AgTerrestialPoint::getNormal() const
 {
-	return Math::NormalUtils::normalForIndex((m_data[1] >> 12) & 0x3FFF);
+	return AgPointCloudNormalUtils::normalForIndex((m_data[1] >> 12) & 0x3FFF);
 }
 
 void AgTerrestialPoint::setNormalIndex(uint32_t normalIndex)
@@ -81,9 +80,9 @@ int AgTerrestialPoint::getNormalIndex() const
 	return ((m_data[1] >> 12) & 0x3FFF);
 }
 
-void AgTerrestialPoint::setNormal(const RCVector3f& normal)
+void AgTerrestialPoint::setNormal(const Vector3& normal)
 {
-	uint32_t index = Math::NormalUtils::indexForNormal(normal);
+	uint32_t index = AgPointCloudNormalUtils::indexForNormal(normal);
 	m_data[1] &= ~(0x3FFF << 12);         //clear normal bits
 	m_data[1] |= (0x3FFF & index) << 12;  //set normal bits
 }

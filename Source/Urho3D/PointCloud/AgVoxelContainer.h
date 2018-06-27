@@ -3,10 +3,6 @@
 #include "../Graphics/Drawable.h"
 #include "../Math/BoundingBox.h"
 
-#include "AgOctreeDefinitions.h"
-
-#include <utility/RCMutex.h>
-
 #include <vector>
 #include <memory>
 
@@ -39,9 +35,15 @@ namespace ambergris {
 			/// Calculate distance and prepare batches for rendering. May be called from worker thread(s), possibly re-entrantly.
 			void UpdateBatches(const Urho3D::FrameInfo& frame) override;
 
+			/// Prepare geometry for rendering.
+			void UpdateGeometry(const Urho3D::FrameInfo& frame) override;
+
+			/// Return whether a geometry update is necessary, and if it can happen in a worker thread.
+			Urho3D::UpdateGeometryType GetUpdateGeometryType() override { return Urho3D::UPDATE_WORKER_THREAD; }
+
 			std::uint32_t							getLODPointCount(std::uint8_t lod) const;
 
-			bool									isGeometryEmpty() const {	return voxelPointsArr_.Empty();	}
+			bool									isGeometryEmpty() const {	return batches_.Empty();	}
 			std::uint64_t							clearGeometry();
 			std::uint64_t							getAllocatedMemory() const;
 
@@ -49,8 +51,6 @@ namespace ambergris {
 			// \brief: load a LIDAR LOD from disk this is a
 			//////////////////////////////////////////////////////////////////////////
 			void                                    loadLODInternal(bool isLidarData, std::uint8_t lodLevel);
-
-			RealityComputing::Common::RCBox                       getSVOBound() const;
 
 			bool                                    isComplete(unsigned LOD) const;
 
@@ -63,8 +63,6 @@ namespace ambergris {
 
 			/// Set geometry.
 			void SetVoxelPoints(AgVoxelPoints* points);
-			/// Return geometry.
-			AgVoxelPoints* GetVoxelPoints(std::uint8_t lod) const { return voxelPointsArr_.At(lod); }
 			/// Return geometry attribute.
 			const Urho3D::String& GetResourceName() const { return resourceName_; }
 			/// Set geometry attribute.
@@ -103,23 +101,7 @@ namespace ambergris {
 
 			void HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
 			void HandlePostRenderUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
-		public:
-			int                                m_currentLODLoaded;             //LOD level loaded in cache
-			int                                m_currentDrawLOD;               //LOD currently used for drawing
-
-			//int                              m_originalIndex;                //original index into VoxelTreeRunTime::m_originalScanContainerList;
-
-			RealityComputing::Common::RCBox                       m_nodeBounds;                   //node bounds
-			RealityComputing::Common::RCBox                       m_svoBounds;                    //voxel bounds
-
-			/*struct VoxelLODInfo {
-				int                                m_amountOfOctreeNodes;
-				int                                m_amountOfLODPoints;
-			};*/
-			double							   m_lastTimeModified;             //last time this node was modified/seen
-																			//TODO: we shall check if we are allowed to change the stack sequence of class members
 		private:
-			Urho3D::Vector<AgVoxelPoints*>		voxelPointsArr_;
 			Urho3D::String								resourceName_;
 			std::uint8_t                                currentDrawLOD_;
 			std::uint8_t                                maximumLOD_;                   //maximum LOD stored in file

@@ -228,6 +228,8 @@ public:
     void SetDepthTest(CompareMode mode);
     /// Set depth write on/off.
     void SetDepthWrite(bool enable);
+	/// Set depth write on/off.
+	void SetEnablePointSize(bool enable);
     /// Set polygon fill mode.
     void SetFillMode(FillMode mode);
     /// Set line antialiasing on/off.
@@ -447,6 +449,9 @@ public:
 
     /// Return whether depth write is enabled.
     bool GetDepthWrite() const { return depthWrite_; }
+
+	/// Return depth write mode.
+	bool EnablePointSize() const { return enablePointSize_; }
 
     /// Return polygon fill mode.
     FillMode GetFillMode() const { return fillMode_; }
@@ -746,7 +751,9 @@ private:
     /// Depth compare mode.
     CompareMode depthTestMode_{};
     /// Depth write enable flag.
-    bool depthWrite_{};
+    bool enablePointSize_{};
+	/// Depth write enable flag.
+	bool depthWrite_{};
     /// Line antialiasing enable flag.
     bool lineAntiAlias_{};
     /// Polygon fill mode.

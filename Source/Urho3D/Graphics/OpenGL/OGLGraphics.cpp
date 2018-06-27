@@ -1862,6 +1862,18 @@ void Graphics::SetDepthWrite(bool enable)
     }
 }
 
+void Graphics::SetEnablePointSize(bool enable)
+{
+	if (enable != enablePointSize_)
+	{
+		if (enable)
+			glEnable(GL_PROGRAM_POINT_SIZE);
+		else
+			glDisable(GL_PROGRAM_POINT_SIZE);
+		enablePointSize_ = enable;
+	}
+}
+
 void Graphics::SetFillMode(FillMode mode)
 {
 #ifndef GL_ES_VERSION_2_0
@@ -3196,6 +3208,7 @@ void Graphics::ResetCachedState()
     slopeScaledDepthBias_ = 0.0f;
     depthTestMode_ = CMP_ALWAYS;
     depthWrite_ = false;
+	enablePointSize_ = false;
     lineAntiAlias_ = false;
     fillMode_ = FILL_SOLID;
     scissorTest_ = false;

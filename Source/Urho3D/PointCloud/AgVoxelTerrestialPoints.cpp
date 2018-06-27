@@ -6,7 +6,6 @@
 #include "../Graphics/Geometry.h"
 
 using namespace Urho3D;
-using namespace ambergris::RealityComputing::Common;
 using namespace ambergris::PointCloudEngine;
 
 AgVoxelTerrestialPoints::AgVoxelTerrestialPoints(Context* context) :

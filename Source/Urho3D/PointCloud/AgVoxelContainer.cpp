@@ -1,12 +1,12 @@
 #include "AgVoxelContainer.h"
 #include "AgVoxelLidarPoints.h"
 #include "AgVoxelTerrestialPoints.h"
-#include "AgOctreeDefinitions.h"
-#include "AgPointCloudEngine.h"
+#include "AgPointCloudOptions.h"
 
 #include "../IO/Log.h"
 #include "../Core/Context.h"
 #include "../Core/CoreEvents.h"
+#include "../Scene/Node.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/Material.h"
 #include "../Resource/ResourceCache.h"
@@ -15,7 +15,6 @@
 #include <algorithm>
 
 using namespace Urho3D;
-using namespace ambergris::RealityComputing::Common;
 using namespace ambergris::PointCloudEngine;
 
 AgVoxelContainer::AgVoxelContainer(Context* context) :
@@ -24,11 +23,8 @@ AgVoxelContainer::AgVoxelContainer(Context* context) :
 	mExternalClipFlag(NON_CLIPPED),
 	mInternalClipFlag(NON_CLIPPED),
 	m_nClipIndex(0),
-	m_currentLODLoaded(-1),
-	m_currentDrawLOD(0),
 	maximumLOD_(0),
-	currentDrawLOD_(0),
-	m_lastTimeModified(0)
+	currentDrawLOD_(0)
 {
 	SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(AgVoxelContainer, HandleUpdate));
 	SubscribeToEvent(E_POSTRENDERUPDATE, URHO3D_HANDLER(AgVoxelContainer, HandlePostRenderUpdate));
@@ -135,27 +131,85 @@ uint8_t  AgVoxelContainer::CalcLOD(const FrameInfo& frame, float pointSize)
 
 void AgVoxelContainer::UpdateBatches(const FrameInfo& frame)
 {
-	const float pointSize = node_->GetVar(VoxelTreeRunTimeVars::VAR_POINTSIZE).GetFloat();
+	float pointSize = node_->GetVar(VoxelTreeRunTimeVars::VAR_POINTSIZE).GetFloat();
+	if (pointSize < 1.0f)
+		pointSize = 1.0f;
 	std::uint8_t currentLod = CalcLOD(frame, pointSize);
-	currentDrawLOD_ = currentLod;//std::max(currentLod, currentDrawLOD_);
+	currentDrawLOD_ = std::max(currentLod, currentDrawLOD_);
+}
+
+void AgVoxelContainer::UpdateGeometry(const FrameInfo& frame)
+{
+	float lodScale = pow(0.5, static_cast<float>(currentDrawLOD_));
+	BoundingBox svoBounds;
+	svoBounds.max_ = node_->GetVar(VoxelTreeRunTimeVars::VAR_SVOBOUNDSMAX).GetVector3();
+	svoBounds.min_ = node_->GetVar(VoxelTreeRunTimeVars::VAR_SVOBOUNDSMIN).GetVector3();
+	svoBounds.Transform(node_->GetWorldTransform());
+	float radius = svoBounds.max_.x_ - svoBounds.min_.x_;
+
+	float pointScalePersp = 0.0f;
+	float pointScaleOrtho = 1.0f;
+
+	if (frame.camera_ ->IsOrthographic())
+	{
+		//camera is orthographic
+		pointScalePersp = 0;
+		/*const float fudgeFactor = 16;
+		pointScaleOrtho = fudgeFactor * lodScale * radius * std::max(frame.viewSize_.x_ / camPlaneDistances.x, frame.viewSize_.y_ / camPlaneDistances.y);*/
+	}
+	else
+	{
+		// camera is perspective
+		float fovScale = std::max(frame.viewSize_.x_ / frame.camera_->GetFov(), frame.viewSize_.y_ / frame.camera_->GetFov());
+		pointScalePersp = 8 * radius * fovScale * lodScale;
+		pointScaleOrtho = 0;
+	}
+
+	for (unsigned i = 0; i < batches_.Size(); i++)
+	{
+		batches_.At(i).material_->SetShaderParameter("PointScalePersp", pointScalePersp);
+		batches_.At(i).material_->SetShaderParameter("PointScaleOrtho", pointScaleOrtho);
+	}
 }
 
 std::uint32_t	AgVoxelContainer::getLODPointCount(std::uint8_t lod) const
 {
-	if (lod <= m_currentLODLoaded)
-		return voxelPointsArr_.At(lod)->getCount();
-	else if (m_currentLODLoaded > 0)   //needs refinement reset to zero
-		return voxelPointsArr_.At(m_currentLODLoaded)->getCount();
+	//const bool isLidarData = node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool();
+	//auto* cache = GetSubsystem<ResourceCache>();
+	//String resourceName = resourceName_;
+
+	//if (lod <= m_currentLODLoaded)
+	//{
+	//	String fileName = resourceName + "_" + Urho3D::String(lod) + ".vxl";
+	//	AgVoxelPoints* res = isLidarData ? (AgVoxelPoints*)cache->GetExistingResource<AgVoxelLidarPoints>(fileName) :
+	//		cache->GetExistingResource<AgVoxelTerrestialPoints>(fileName);
+	//	return res ? res->getCount() : 0;
+	//}
+	//else if (m_currentLODLoaded > 0)   //needs refinement reset to zero
+	//{
+	//	String fileName = resourceName + "_" + Urho3D::String(m_currentLODLoaded) + ".vxl";
+	//	AgVoxelPoints* res = isLidarData ? (AgVoxelPoints*)cache->GetExistingResource<AgVoxelLidarPoints>(fileName) :
+	//		cache->GetExistingResource<AgVoxelTerrestialPoints>(fileName);
+	//	return res ? res->getCount() : 0;
+	//}
 	
 	return 0;
 }
 
 std::uint64_t	AgVoxelContainer::getAllocatedMemory() const
 {
+	const bool isLidarData = node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool();
+	auto* cache = GetSubsystem<ResourceCache>();
+
 	std::uint64_t mem = 0;
-	for (int i = 0; i < voxelPointsArr_.Size(); i ++)
+	for (unsigned i = 0; i < batches_.Size(); i ++)
 	{
-		mem += voxelPointsArr_.At(i)->getAllocatedMemory();
+		String fileName = resourceName_ + "_" + Urho3D::String(i) + ".vxl";
+		AgVoxelPoints* res = isLidarData ? (AgVoxelPoints*)cache->GetExistingResource<AgVoxelLidarPoints>(fileName) :
+			cache->GetExistingResource<AgVoxelTerrestialPoints>(fileName);
+		if(!res)
+			continue;
+		mem += res->getAllocatedMemory();
 	}
 
 	return mem;
@@ -163,12 +217,20 @@ std::uint64_t	AgVoxelContainer::getAllocatedMemory() const
 
 std::uint64_t	AgVoxelContainer::clearGeometry()
 {
+	const bool isLidarData = node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool();
+	auto* cache = GetSubsystem<ResourceCache>();
+
 	std::uint64_t mem = 0;
-	for (int i = 0; i < voxelPointsArr_.Size(); i++)
+	for (unsigned i = 0; i < batches_.Size(); i++)
 	{
-		mem += voxelPointsArr_.At(i)->clear();
+		String fileName = resourceName_ + "_" + Urho3D::String(i) + ".vxl";
+		AgVoxelPoints* res = isLidarData ? (AgVoxelPoints*)cache->GetExistingResource<AgVoxelLidarPoints>(fileName) :
+			cache->GetExistingResource<AgVoxelTerrestialPoints>(fileName);
+		if (!res)
+			continue;
+		mem += res->clear();
 	}
-	voxelPointsArr_.Clear();
+	batches_.Clear();
 	return mem;
 }
 
@@ -211,9 +273,9 @@ void AgVoxelContainer::SetVoxelPoints(AgVoxelPoints* points)
 	if (!points)
 		return;
 
-	for (int i = 0; i < voxelPointsArr_.Size(); i++)
+	for (int i = 0; i < batches_.Size(); i++)
 	{
-		if (voxelPointsArr_.At(i) == points)
+		if (batches_.At(i).geometry_ == points->getGeometry())
 			return;
 	}
 
@@ -227,8 +289,6 @@ void AgVoxelContainer::SetVoxelPoints(AgVoxelPoints* points)
 	/*if (voxelPoints_)
 		UnsubscribeFromEvent(voxelPoints_, E_RELOADFINISHED);*/
 
-	voxelPointsArr_.Push(points);
-
 	SourceBatch srcBatch;
 	srcBatch.geometry_ = points->getGeometry();
 	srcBatch.worldTransform_ = node_ ? &node_->GetWorldTransform() : nullptr;
@@ -238,8 +298,21 @@ void AgVoxelContainer::SetVoxelPoints(AgVoxelPoints* points)
 	srcBatch.material_ = cache->GetResource<Material>(resRef.name_);
 	if (srcBatch.material_)
 	{
-		const float pointSize = node_->GetVar(VoxelTreeRunTimeVars::VAR_POINTSIZE).GetFloat();
+		float pointSize = node_->GetVar(VoxelTreeRunTimeVars::VAR_POINTSIZE).GetFloat();
+		if (pointSize < 1.0f)
+			pointSize = 1.0f;
 		srcBatch.material_->SetShaderParameter("PointSize", pointSize);
+
+		//if (bFalseColor)
+		{
+			const Vector3& scanBoundsMax = node_->GetVar(VoxelTreeRunTimeVars::VAR_SCANBOUNDSMAX).GetVector3();
+			const Vector3& scanBoundsMin = node_->GetVar(VoxelTreeRunTimeVars::VAR_SCANBOUNDSMIN).GetVector3();
+			if (scanBoundsMax.z_ > scanBoundsMin.z_)
+			{
+				srcBatch.material_->SetShaderParameter("HeightMax", scanBoundsMax.z_);
+				srcBatch.material_->SetShaderParameter("HeightMin", scanBoundsMin.z_);
+			}
+		}
 	}
 	batches_.Push(srcBatch);
 
@@ -278,12 +351,12 @@ void AgVoxelContainer::loadLODInternal(bool isLidarData, std::uint8_t lodLevel)
 	if (lodLevel > maximumLOD_)
 		lodLevel = maximumLOD_;
 
-	SubscribeToEvent(E_RESOURCEBACKGROUNDLOADED, URHO3D_HANDLER(AgVoxelContainer, HandleResourceBackgroundLoaded));
-
-	const unsigned oldLod = voxelPointsArr_.Size();
+	const unsigned oldLod = batches_.Size();
 	auto* cache = GetSubsystem<ResourceCache>();
 	for (unsigned i = oldLod; i < (unsigned)lodLevel; i ++)
 	{
+		SubscribeToEvent(E_RESOURCEBACKGROUNDLOADED, URHO3D_HANDLER(AgVoxelContainer, HandleResourceBackgroundLoaded));
+
 		String fileName = resourceName_ + "_" + Urho3D::String(i) + ".vxl";
 		if(isLidarData)
 			cache->BackgroundLoadResource<AgVoxelLidarPoints>(fileName, true, nullptr, id_);
@@ -342,11 +415,6 @@ void AgVoxelContainer::HandleResourceBackgroundLoaded(StringHash eventType, Vari
 
 	return svoBound;
 }*/
-
-RCBox AgVoxelContainer::getSVOBound() const
-{
-	return m_svoBounds;
-}
 
 /*double AgVoxelContainer::getFinestBoundLength()
 {
@@ -418,7 +486,7 @@ std::vector<int> AgVoxelContainer::getVisibleNodeIndices()
 
 bool AgVoxelContainer::isComplete(unsigned lod) const
 {
-	return lod <= voxelPointsArr_.Size();
+	return lod <= batches_.Size();
 }
 
 //bool AgVoxelContainer::LoadJSON(const JSONValue& source)
@@ -478,19 +546,18 @@ bool AgVoxelContainer::isComplete(unsigned lod) const
 void AgVoxelContainer::HandleUpdate(StringHash eventType, VariantMap& eventData)
 {
 	const bool isLidarData = node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool();
-	const int oldLod = voxelPointsArr_.Size();
-	if (!voxelPointsArr_.Empty() && (oldLod - (int)currentDrawLOD_ > 3))
+	const int oldLod = batches_.Size();
+	if (!batches_.Empty() && (oldLod - (int)currentDrawLOD_ > 3))
 	{
 		for (unsigned i = currentDrawLOD_; i < oldLod; i++)
 		{
 			batches_.Pop();
-			AgVoxelPoints* points = voxelPointsArr_.Back();
-			voxelPointsArr_.Pop();
+			String fileName = resourceName_ + "_" + Urho3D::String(i) + ".vxl";
 			auto* cache = GetSubsystem<ResourceCache>();
 			if (isLidarData)
-				cache->ReleaseResource<AgVoxelLidarPoints>(points->GetName(), /*force*/true);//TODO
+				cache->ReleaseResource<AgVoxelLidarPoints>(fileName, /*force*/true);//TODO
 			else
-				cache->ReleaseResource<AgVoxelTerrestialPoints>(points->GetName(), /*force*/true);
+				cache->ReleaseResource<AgVoxelTerrestialPoints>(fileName, /*force*/true);
 		}
 	}
 	//reset
@@ -501,9 +568,9 @@ void AgVoxelContainer::HandleUpdate(StringHash eventType, VariantMap& eventData)
 void AgVoxelContainer::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
 {
 	const bool isLidarData = node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool();
-	const int oldLod = voxelPointsArr_.Size();
+	const int oldLod = batches_.Size();
 	if (currentDrawLOD_ > oldLod)
 	{
 		loadLODInternal(isLidarData, oldLod + 1);
-	}	
+	}
 }

@@ -1,7 +1,6 @@
 #pragma once
-#include <common/RCVectorFwd.h>
-
-#include <stdint.h>
+#include "../Math/Vector3.h"
+#include "AgCompactColor.h"
 
 //////////////////////////////////////////////////////////////////////////
 // \brief: VoxelLidarPoint Point format for LIDAR based data
@@ -28,17 +27,17 @@ namespace ambergris {
 		{
 			AgLidarPoint();
 
-			RealityComputing::Common::RCVector3f  getRawCoord() const;
-			void                                    setRawCoord(const RealityComputing::Common::RCVector3f& val);
+			Urho3D::Vector3				getRawCoord() const;
+			void                                    setRawCoord(const Urho3D::Vector3& val);
 
-			void                                    setNormal(const RealityComputing::Common::RCVector3f& normal);
-			RealityComputing::Common::RCVector3f                      getNormal() const;
+			void                                    setNormal(const Urho3D::Vector3& normal);
+			Urho3D::Vector3                      getNormal() const;
 
 			void                                    setNormalIndex(uint32_t normalIndex);
 			int                                     getNormalIndex() const;
 
-			void                                                                setRGBA(const RealityComputing::Common::RCVector4ub& rgba);
-			ambergris::RealityComputing::Common::RCVector4ub                     getRGBA() const;
+			void                                setRGBA(const AgCompactColor& rgba);
+			AgCompactColor                     getRGBA() const;
 
 			void                                    setLidarClassification(uint8_t lidarData);
 			uint8_t                            getLidarClassification() const;
@@ -60,7 +59,7 @@ namespace ambergris {
 			//bool                               isDeleted(const VoxelContainer* parentVoxelContainer) const;
 
 			float                              m_pos[3];
-			uint8_t                            m_rgba[4];
+			AgCompactColor                       m_rgba;
 			uint32_t                           m_misc;         //normals, lidar classification
 		};
 	}

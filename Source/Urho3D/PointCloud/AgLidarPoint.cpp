@@ -1,38 +1,36 @@
 #include "AgLidarPoint.h"
+#include "AgPointCloudNormalUtils.h"
 
-#include <common/RCVector.h>
-
-using namespace ambergris::RealityComputing::Common;
+using namespace Urho3D;
 using namespace ambergris::PointCloudEngine;
 
 AgLidarPoint::AgLidarPoint()
 {
 	m_pos[0] = m_pos[1] = m_pos[2] = 0.0f;
-	m_rgba[0] = m_rgba[1] = m_rgba[2] = m_rgba[3] = 0;
 	m_misc = 0;
 }
 
-RCVector3f AgLidarPoint::getRawCoord() const
+Vector3 AgLidarPoint::getRawCoord() const
 {
-	return RCVector3f(m_pos[0], m_pos[1], m_pos[2]);
+	return Vector3(m_pos[0], m_pos[1], m_pos[2]);
 }
 
-void AgLidarPoint::setRawCoord(const RCVector3f& val)
+void AgLidarPoint::setRawCoord(const Vector3& val)
 {
-	m_pos[0] = val.x;
-	m_pos[1] = val.y;
-	m_pos[2] = val.z;
+	m_pos[0] = val.x_;
+	m_pos[1] = val.y_;
+	m_pos[2] = val.z_;
 }
 
-void AgLidarPoint::setNormal(const RCVector3f& normal)
+void AgLidarPoint::setNormal(const Vector3& normal)
 {
-	int normalIndex = Math::NormalUtils::indexForNormal(normal);
+	int normalIndex = AgPointCloudNormalUtils::indexForNormal(normal);
 	setNormalIndex(normalIndex);
 }
 
-RCVector3f AgLidarPoint::getNormal() const
+Vector3 AgLidarPoint::getNormal() const
 {
-	return Math::NormalUtils::normalForIndex(getNormalIndex());
+	return AgPointCloudNormalUtils::normalForIndex(getNormalIndex());
 }
 
 void AgLidarPoint::setNormalIndex(uint32_t normalIndex)
@@ -46,17 +44,14 @@ int AgLidarPoint::getNormalIndex() const
 	return (m_misc & 0x3FFF);
 }
 
-void AgLidarPoint::setRGBA(const RCVector4ub& rgba)
+void AgLidarPoint::setRGBA(const AgCompactColor& rgba)
 {
-	m_rgba[0] = rgba.x;
-	m_rgba[1] = rgba.y;
-	m_rgba[2] = rgba.z;
-	m_rgba[3] = rgba.w;
+	m_rgba = rgba;
 }
 
-RCVector4ub AgLidarPoint::getRGBA() const
+AgCompactColor AgLidarPoint::getRGBA() const
 {
-	return RCVector4ub(m_rgba[0], m_rgba[1], m_rgba[2], m_rgba[3]);
+	return m_rgba;
 }
 
 void AgLidarPoint::setLidarClassification(uint8_t val)

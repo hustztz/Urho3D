@@ -1,7 +1,6 @@
 #pragma once
-#include <common/RCVectorFwd.h>
-
-#include <stdint.h>
+#include "../Math/Vector3.h"
+#include "AgCompactColor.h"
 
 //////////////////////////////////////////////////////////////////////////
 // \brief: VoxelTerrestialPoint  Compressed format for terrestrial based data
@@ -35,14 +34,14 @@ namespace ambergris {
 		{
 			AgTerrestialPoint();
 
-			RealityComputing::Common::RCVector3f  getRawCoord() const;
-			void                                    setRawCoord(const RealityComputing::Common::RCVector3f& val);
+			Urho3D::Vector3  getRawCoord() const;
+			void                                    setRawCoord(const Urho3D::Vector3& val);
 
-			RealityComputing::Common::RCVector4ub                     getRGBA() const;
-			void                                    setRGBA(const RealityComputing::Common::RCVector4ub& val);
+			AgCompactColor                     getRGBA() const;
+			void                                    setRGBA(const AgCompactColor& val);
 
-			RealityComputing::Common::RCVector3f                      getNormal() const;
-			void                                    setNormal(const RealityComputing::Common::RCVector3f& normal);
+			Urho3D::Vector3                      getNormal() const;
+			void                                    setNormal(const Urho3D::Vector3& normal);
 
 			void                                    setNormalIndex(uint32_t normalIndex);
 			int                                     getNormalIndex() const;

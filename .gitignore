@@ -11,6 +11,7 @@
 /include/
 /lib*/
 generated/
+/msvc14/
 /Source/Urho3D/tolua++-prefix/
 
 # Output files
