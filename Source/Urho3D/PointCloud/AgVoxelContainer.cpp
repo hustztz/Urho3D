@@ -6,8 +6,9 @@
 #include "../IO/Log.h"
 #include "../Core/Context.h"
 #include "../Core/CoreEvents.h"
-#include "../Scene/Node.h"
+#include "../Scene/Scene.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/Geometry.h"
 #include "../Graphics/Material.h"
 #include "../Resource/ResourceCache.h"
 #include "../Resource/ResourceEvents.h"
@@ -26,6 +27,8 @@ AgVoxelContainer::AgVoxelContainer(Context* context) :
 	maximumLOD_(0),
 	currentDrawLOD_(0)
 {
+	resourceName_.Clear();
+
 	SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(AgVoxelContainer, HandleUpdate));
 	SubscribeToEvent(E_POSTRENDERUPDATE, URHO3D_HANDLER(AgVoxelContainer, HandlePostRenderUpdate));
 }
@@ -161,14 +164,16 @@ void AgVoxelContainer::UpdateGeometry(const FrameInfo& frame)
 	{
 		// camera is perspective
 		float fovScale = std::max(frame.viewSize_.x_ / frame.camera_->GetFov(), frame.viewSize_.y_ / frame.camera_->GetFov());
-		pointScalePersp = 8 * radius * fovScale * lodScale;
+		pointScalePersp = 2 * radius * fovScale * lodScale;
 		pointScaleOrtho = 0;
 	}
 
 	for (unsigned i = 0; i < batches_.Size(); i++)
 	{
-		batches_.At(i).material_->SetShaderParameter("PointScalePersp", pointScalePersp);
-		batches_.At(i).material_->SetShaderParameter("PointScaleOrtho", pointScaleOrtho);
+		if(batches_.At(i).geometry_)
+			batches_[i].geometry_->SetLodDistance( pointScalePersp );
+		//batches_.At(i).material_->SetShaderParameter("PointScalePersp", pointScalePersp);
+		//batches_.At(i).material_->SetShaderParameter("PointScaleOrtho", pointScaleOrtho);
 	}
 }
 
@@ -302,6 +307,21 @@ void AgVoxelContainer::SetVoxelPoints(AgVoxelPoints* points)
 		if (pointSize < 1.0f)
 			pointSize = 1.0f;
 		srcBatch.material_->SetShaderParameter("PointSize", pointSize);
+
+		bool hasNormal = node_->GetVar(VoxelTreeRunTimeVars::VAR_HASNORMALS).GetBool();
+		if (hasNormal)
+		{
+			Scene* scene = GetScene();
+			AgPointCloudOptions* options = scene->GetComponent<AgPointCloudOptions>();
+			if (options)
+			{
+				Texture2D* normTable = options->getNormalTable();
+				if (normTable)
+				{
+					srcBatch.material_->SetTexture(TU_NORMALTABLE, normTable);
+				}
+			}
+		}
 
 		//if (bFalseColor)
 		{

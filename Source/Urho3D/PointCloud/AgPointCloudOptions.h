@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../Scene/Component.h"
+#include "../Graphics/Texture2D.h"
+
 #include "AgCompactColor.h"
 
 #ifndef ALIGNAS
@@ -139,11 +141,22 @@ namespace ambergris {
 			{
 			}
 
+			/// Register object factory. Drawable must be registered first.
+			static void RegisterObject(Urho3D::Context* context);
+
 			void setPointSize(float value) { pointSize_ = value; }
 			float getPointSize() const { return pointSize_; }
 
+			void setOffset(const Urho3D::Vector3& value) { offset_ = value; }
+			const Urho3D::Vector3& getOffset() const { return offset_; }
+
+			void initNormalTexture();
+			Urho3D::Texture2D* getNormalTable();
+
 		private:
 			float pointSize_;
+			Urho3D::Vector3 offset_;
+			Urho3D::SharedPtr<Urho3D::Texture2D> normalTexture_;
 		};
 	}
 }

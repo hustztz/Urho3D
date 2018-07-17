@@ -1,7 +1,42 @@
 #include "AgPointCloudOptions.h"
 
+#include "../Core/Context.h"
+#include "../Graphics/Graphics.h"
+#include "../PointCloud/AgPointCloudNormalUtils.h"
+
 using namespace Urho3D;
 using namespace ambergris::PointCloudEngine;
+
+void AgPointCloudOptions::RegisterObject(Context* context)
+{
+	context->RegisterFactory<AgPointCloudOptions>();
+
+	URHO3D_ACCESSOR_ATTRIBUTE("Point Size", getPointSize, setPointSize, float, 1.0f, AM_FILE);
+	URHO3D_ACCESSOR_ATTRIBUTE("Offset", getOffset, setOffset, Vector3, Vector3::ZERO, AM_FILE);
+}
+
+void AgPointCloudOptions::initNormalTexture()
+{
+	if (normalTexture_)
+		return;
+
+	const float* normalsRGB = AgPointCloudNormalUtils::getNormals();
+	if (!normalsRGB)
+		return;
+
+	normalTexture_ = context_->CreateObject<Texture2D>();
+	normalTexture_->SetSize(128, 128, Graphics::GetRGBFormat(), TEXTURE_STATIC, 1, false);
+	normalTexture_->SetData(0, 0, 0, 128, 128, normalsRGB);
+
+	normalTexture_->ClearDataLost();
+}
+
+Texture2D* AgPointCloudOptions::getNormalTable()
+{
+	if (!normalTexture_)
+		initNormalTexture();
+	return normalTexture_;
+}
 
 //////////////////////////////////////////////////////////////////////////
 //Class VoxelLeafNode
