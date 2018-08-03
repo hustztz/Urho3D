@@ -1,4 +1,4 @@
-﻿//
+//
 
 // Copyright (c) 2008-2018 the Urho3D project.
 //
@@ -35,6 +35,9 @@
 #include "../Graphics/Zone.h"
 #include "../IO/Log.h"
 #include "../Scene/Scene.h"
+#include "../Graphics/Technique.h"
+#include "../core/Thread.h"
+#include "../Core/CoreEvents.h"
 
 #include "../DebugNew.h"
 
@@ -44,6 +47,8 @@
 
 namespace Urho3D
 {
+///V7.0迁移Mesh
+const char*	V7_MESH_CATEGORY = "V7_Mesh";
 
 const char* GEOMETRY_CATEGORY = "Geometry";
 
@@ -55,35 +60,54 @@ SourceBatch::~SourceBatch() = default;
 
 SourceBatch& SourceBatch::operator =(const SourceBatch& rhs)= default;
 
+OverrideShaderParameterAnimationInfo::OverrideShaderParameterAnimationInfo(Drawable* drawable, const String& name, ValueAnimation* attributeAnimation,
+	WrapMode wrapMode, float speed) :
+	ValueAnimationInfo(drawable, attributeAnimation, wrapMode, speed),
+	name_(name)
+{
+}
+
+OverrideShaderParameterAnimationInfo::OverrideShaderParameterAnimationInfo(const OverrideShaderParameterAnimationInfo& other) = default;
+
+OverrideShaderParameterAnimationInfo::~OverrideShaderParameterAnimationInfo() = default;
+
+void OverrideShaderParameterAnimationInfo::ApplyValue(const Variant& newValue)
+{
+	static_cast<Drawable*>(target_.Get())->SetOverrideShaderParameter(name_, newValue);
+}
 
 Drawable::Drawable(Context* context, unsigned char drawableFlags) :
-    Component(context),
-    boundingBox_(0.0f, 0.0f),
-    drawableFlags_(drawableFlags),
-    worldBoundingBoxDirty_(true),
-    castShadows_(false),
-    occluder_(false),
-    occludee_(true),
-    updateQueued_(false),
-    zoneDirty_(false),
-    octant_(nullptr),
-    zone_(nullptr),
-    viewMask_(DEFAULT_VIEWMASK),
-    lightMask_(DEFAULT_LIGHTMASK),
-    shadowMask_(DEFAULT_SHADOWMASK),
-    zoneMask_(DEFAULT_ZONEMASK),
-    viewFrameNumber_(0),
-    distance_(0.0f),
-    lodDistance_(0.0f),
-    drawDistance_(0.0f),
-    shadowDistance_(0.0f),
-    sortValue_(0.0f),
-    minZ_(0.0f),
-    maxZ_(0.0f),
-    lodBias_(1.0f),
-    basePassFlags_(0),
-    maxLights_(0),
-    firstLight_(nullptr)
+	Component(context),
+	boundingBox_(0.0f, 0.0f),
+	drawableFlags_(drawableFlags),
+	worldBoundingBoxDirty_(true),
+	castShadows_(false),
+	occluder_(false),
+	occludee_(true),
+	updateQueued_(false),
+	zoneDirty_(false),
+	octant_(nullptr),
+	zone_(nullptr),
+	viewMask_(DEFAULT_VIEWMASK),
+	overrideViewMask_(DEFAULT_VIEWMASK),
+	lightMask_(DEFAULT_LIGHTMASK),
+	shadowMask_(DEFAULT_SHADOWMASK),
+	zoneMask_(DEFAULT_ZONEMASK),
+	viewFrameNumber_(0),
+	distance_(0.0f),
+	lodDistance_(0.0f),
+	drawDistance_(0.0f),
+	shadowDistance_(0.0f),
+	sortValue_(0.0f),
+	minZ_(0.0f),
+	maxZ_(0.0f),
+	lodBias_(1.0f),
+	basePassFlags_(0),
+	maxLights_(0),
+	firstLight_(nullptr),
+	dynamicType_(Static),
+	overrideTechnique_(nullptr),
+	overrideFillMode_(FILL_SOLID)
 {
     if (drawableFlags == DRAWABLE_UNDEFINED || drawableFlags > DRAWABLE_ANY)
     {
@@ -94,10 +118,20 @@ Drawable::Drawable(Context* context, unsigned char drawableFlags) :
 Drawable::~Drawable()
 {
     RemoveFromOctree();
+	overrideShaderParameters_.Clear();
 }
+
+const char* ObjectDynamicType[] =
+{
+	"Dynamic",
+	"Static",
+	nullptr
+};
+
 
 void Drawable::RegisterObject(Context* context)
 {
+	URHO3D_ENUM_ATTRIBUTE("Dynamic Type", dynamicType_, ObjectDynamicType, Static, AM_FILE);
     URHO3D_ATTRIBUTE("Max Lights", int, maxLights_, 0, AM_DEFAULT);
     URHO3D_ATTRIBUTE("View Mask", int, viewMask_, DEFAULT_VIEWMASK, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Light Mask", int, lightMask_, DEFAULT_LIGHTMASK, AM_DEFAULT);
@@ -194,7 +228,19 @@ void Drawable::SetViewMask(unsigned mask)
     MarkNetworkUpdate();
 }
 
-void Drawable::SetLightMask(unsigned mask)
+void Drawable::SetOverrideViewMask(unsigned mask)
+{
+	overrideViewMask_ = mask;
+	MarkNetworkUpdate();
+}
+
+void Drawable::CancelOverrideViewMask()
+{
+	overrideViewMask_ = DEFAULT_VIEWMASK;
+	MarkNetworkUpdate();
+}
+
+	void Drawable::SetLightMask(unsigned mask)
 {
     lightMask_ = mask;
     MarkNetworkUpdate();
@@ -213,7 +259,11 @@ void Drawable::SetZoneMask(unsigned mask)
     OnMarkedDirty(node_);
     MarkNetworkUpdate();
 }
-
+void Drawable::SetDynamicType(DynamicType type)
+{
+	dynamicType_ = type;
+	MarkNetworkUpdate();
+}
 void Drawable::SetMaxLights(unsigned num)
 {
     maxLights_ = num;
@@ -357,6 +407,82 @@ void Drawable::LimitVertexLights(bool removeConvertedLights)
     vertexLights_.Resize(MAX_VERTEX_LIGHTS);
 }
 
+void Drawable::SetOverrideShaderParameterAnimation(const String& name, ValueAnimation* animation, WrapMode wrapMode, float speed)
+{
+	OverrideShaderParameterAnimationInfo* info = GetOverrideShaderParameterAnimationInfo(name);
+
+	if (animation)
+	{
+		if (info && info->GetAnimation() == animation)
+		{
+			info->SetWrapMode(wrapMode);
+			info->SetSpeed(speed);
+			return;
+		}
+
+		StringHash nameHash(name);
+		overrideShaderParameterAnimationInfos_[nameHash] = new OverrideShaderParameterAnimationInfo(this, name, animation, wrapMode, speed);
+		UpdateEventSubscription();
+	} else
+	{
+		if (info)
+		{
+			StringHash nameHash(name);
+			overrideShaderParameterAnimationInfos_.Erase(nameHash);
+			RemoveOverrideShaderParameter(name);
+			UpdateEventSubscription();
+		}
+	}
+}
+
+OverrideShaderParameterAnimationInfo* Drawable::GetOverrideShaderParameterAnimationInfo(const String& name) const
+{
+	StringHash nameHash(name);
+	HashMap<StringHash, SharedPtr<OverrideShaderParameterAnimationInfo> >::ConstIterator i = overrideShaderParameterAnimationInfos_.Find(nameHash);
+	if (i == overrideShaderParameterAnimationInfos_.End())
+		return nullptr;
+	return i->second_;
+}
+
+void Drawable::UpdateEventSubscription()
+{
+	if (overrideShaderParameterAnimationInfos_.Size() && !subscribed_)
+	{
+		SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(Drawable, HandleAttributeAnimationUpdate));
+		subscribed_ = true;
+	} else if (subscribed_ && overrideShaderParameterAnimationInfos_.Empty())
+	{
+		UnsubscribeFromEvent(E_UPDATE);
+		subscribed_ = false;
+	}
+}
+
+void Drawable::HandleAttributeAnimationUpdate(StringHash eventType, VariantMap& eventData)
+{
+	// Timestep parameter is same no matter what event is being listened to
+	float timeStep = eventData[Update::P_TIMESTEP].GetFloat();
+
+	// Keep weak pointer to self to check for destruction caused by event handling
+	WeakPtr<Object> self(this);
+
+	Vector<String> finishedNames;
+	for (HashMap<StringHash, SharedPtr<OverrideShaderParameterAnimationInfo> >::ConstIterator i = overrideShaderParameterAnimationInfos_.Begin();
+	i != overrideShaderParameterAnimationInfos_.End(); ++i)
+	{
+		bool finished = i->second_->Update(timeStep);
+		// If self deleted as a result of an event sent during animation playback, nothing more to do
+		if (self.Expired())
+			return;
+
+		if (finished)
+			finishedNames.Push(i->second_->GetName());
+	}
+
+	// Remove finished animations
+	for (unsigned i = 0; i < finishedNames.Size(); ++i)
+		SetOverrideShaderParameterAnimation(finishedNames[i], nullptr);
+}
+
 void Drawable::OnNodeSet(Node* node)
 {
     if (node)
@@ -418,85 +544,94 @@ void Drawable::RemoveFromOctree()
         octant_->RemoveDrawable(this);
     }
 }
+
 Pass* Drawable::AddPass(const String& passName, const String& vsName, const String& psName, const String& vsDefines, const String& psDefines)
 {
-	return AddPass(0, passName, vsName, psName, vsDefines, psDefines);
-}
-
-Pass* Drawable::AddPass(unsigned int index, const String& passName, const String& vsName, const String& psName, const String& vsDefines, const String& psDefines)
-{
-	if (index >= batches_.Size())
+#ifdef 	URHO3D_THREADING
+	if(!Thread::IsMainThread())
 	{
-		URHO3D_LOGERROR("When Adding a pass£¬Material index out of bounds");
+		URHO3D_LOGERROR("Drawable#AddPass was called in non-main thread!!!!!!!!");
 		return nullptr;
 	}
-	if (batches_[index].addPassNames_.Contains(passName))
+#endif
+	HashMap<String, SharedPtr<Pass>>::Iterator i = separatePasses_.Find(passName);
+	if (i != separatePasses_.End())
 	{
-		URHO3D_LOGDEBUG("Have containing this pass"); //自己加的pass名字应该区别开
+		//URHO3D_LOGDEBUG("When Adding a pass Material index out of bounds");
 		return nullptr;
-	}
-
-	if (batches_[index].addPassNames_.Size() == 0)
+	}		
+	else
 	{
-		if (batches_[index].material_)
-		{
-			batches_[index].oldMaterial_ = batches_[index].material_;
-			batches_[index].material_ = batches_[index].oldMaterial_->Clone();
-			batches_[index].oldTechnique_ = batches_[index].oldMaterial_->GetTechnique(0);
-			batches_[index].material_->SetTechnique(0, batches_[index].oldMaterial_->GetTechnique(0)->Clone());
-		}
-		else
-		{
-			batches_[index].oldMaterial_ = nullptr;
-			batches_[index].material_ = node_->GetSubsystem<Renderer>()->GetDefaultMaterial()->Clone();
-			batches_[index].oldTechnique_ = nullptr;
-			batches_[index].material_->SetTechnique(0, batches_[index].material_->GetTechnique(0)->Clone());
-		}
+		separatePasses_[passName] = new Pass(passName);
+		separatePasses_[passName]->SetVertexShader(vsName);
+		separatePasses_[passName]->SetPixelShader(psName);
+		separatePasses_[passName]->SetVertexShaderDefines(vsDefines);
+		separatePasses_[passName]->SetPixelShaderDefines(psDefines);
+		return separatePasses_[passName];
 	}
-	auto* pass = batches_[index].material_->GetTechnique(0)->CreatePass(passName);
-	pass->SetVertexShader(vsName);
-	pass->SetPixelShader(psName);
-	pass->SetVertexShaderDefines(vsDefines);
-	pass->SetPixelShaderDefines(psDefines);
-
-	batches_[index].addPassNames_.Insert(passName);
-
-	return pass;
 }
 
 bool Drawable::RemovePass(const String& passName)
 {
-	return RemovePass(0, passName);
-}
-
-bool Drawable::RemovePass(unsigned int index, const String& passName)
-{
-	if (index >= batches_.Size())
+#ifdef 	URHO3D_THREADING
+	if (!Thread::IsMainThread())
 	{
-		URHO3D_LOGERROR("When removing a pass£¬Material index out of bounds");
+		URHO3D_LOGERROR("Drawable#RemovePass was called in non-main thread!!!!!!!!");
 		return false;
 	}
-	if (batches_[index].addPassNames_.Size() == 0)
-		return true;
-	batches_[index].addPassNames_.Erase(passName);
-	batches_[index].material_->GetTechnique(0)->RemovePass(passName);
-	if (batches_[index].addPassNames_.Size() == 0)
+#endif
+	separatePasses_.Erase(passName);
+	return true;
+}
+
+Pass* Drawable::GetPass(String passName)
+{
+	HashMap<String, SharedPtr<Pass>>::Iterator i = separatePasses_.Find(passName);
+	if (i != separatePasses_.End())
 	{
-		if (batches_[index].oldMaterial_)
-		{
-			batches_[index].material_ = batches_[index].oldMaterial_;
-			batches_[index].oldMaterial_ = nullptr;
-			batches_[index].oldTechnique_ = nullptr;
-		}
-		else
-		{
-			batches_[index].material_ = nullptr;
-		}
+		return i->second_;
+	} 
+	
+	return nullptr;
+}
+
+void Drawable::SetOverrideShaderParameter(const String& name, const Variant& value)
+{
+#ifdef 	URHO3D_THREADING
+	if (!Thread::IsMainThread())
+	{
+		URHO3D_LOGERROR("Drawable#SetOverrideShaderParameter was called in non-main thread!!!!!!!!");
+		return;
+	}
+#endif
+	MaterialShaderParameter newParam;
+	newParam.name_ = name;
+	newParam.value_ = value;
+
+	StringHash nameHash(name);
+	
+	overrideShaderParameters_[nameHash] = newParam;
+}
+
+bool Drawable::RemoveOverrideShaderParameter(const String& name)
+{
+#ifdef 	URHO3D_THREADING
+	if (!Thread::IsMainThread())
+	{
+		URHO3D_LOGERROR("Drawable#RemoveOverrideShaderParameter was called in non-main thread!!!!!!!!");
+		return false;
+	}
+#endif
+	StringHash nameHash(name);
+	HashMap<StringHash, MaterialShaderParameter>::Iterator iter = overrideShaderParameters_.Find(nameHash);
+	if (iter != overrideShaderParameters_.End())
+	{
+		overrideShaderParameters_.Erase(nameHash);
 	}
 	return true;
 }
 
-bool WriteDrawablesToOBJ(PODVector<Drawable*> drawables, File* outputFile, bool asZUp, bool asRightHanded, bool writeLightmapUV)
+	bool WriteDrawablesToOBJ(PODVector<Drawable*> drawables, File* outputFile, bool asZUp, bool asRightHanded, bool writeLightmapUV)
 {
     // Must track indices independently to deal with potential mismatching of drawables vertex attributes (ie. one with UV, another without, then another with)
     unsigned currentPositionIndex = 1;

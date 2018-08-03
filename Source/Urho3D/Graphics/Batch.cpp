@@ -133,6 +133,59 @@ void CalculateShadowMatrix(Matrix4& dest, LightBatchQueue* queue, unsigned split
     dest = texAdjust * shadowProj * shadowView;
 }
 
+void CalculateDirectionalLightStaticShadowMatrix(Matrix4& dest, LightBatchQueue* queue, Renderer* renderer)
+{
+	Camera* shadowCamera = queue->staticShadow_.shadowCamera_;
+	const IntRect& viewport = queue->staticShadow_.shadowViewport_;
+
+	const Matrix3x4& shadowView(shadowCamera->GetView());
+	Matrix4 shadowProj(shadowCamera->GetGPUProjection());
+	Matrix4 texAdjust(Matrix4::IDENTITY);
+
+	Texture2D* shadowMap = queue->shadowMap_;
+	if (!shadowMap)
+		return;
+
+	auto width = (float)shadowMap->GetWidth();
+	auto height = (float)shadowMap->GetHeight();
+
+	Vector3 offset(
+		(float)viewport.left_ / width,
+		(float)viewport.top_ / height,
+		0.0f
+		);
+
+	Vector3 scale(
+		0.5f * (float)viewport.Width() / width,
+		0.5f * (float)viewport.Height() / height,
+		1.0f
+		);
+
+	// Add pixel-perfect offset if needed by the graphics API
+	const Vector2& pixelUVOffset = Graphics::GetPixelUVOffset();
+	offset.x_ += scale.x_ + pixelUVOffset.x_ / width;
+	offset.y_ += scale.y_ + pixelUVOffset.y_ / height;
+
+#ifdef URHO3D_OPENGL
+	offset.z_ = 0.5f;
+	scale.z_ = 0.5f;
+	offset.y_ = 1.0f - offset.y_;
+#else
+	scale.y_ = -scale.y_;
+#endif
+
+	// If using 4 shadow samples, offset the position diagonally by half pixel
+	if (renderer->GetShadowQuality() == SHADOWQUALITY_PCF_16BIT || renderer->GetShadowQuality() == SHADOWQUALITY_PCF_24BIT)
+	{
+		offset.x_ -= 0.5f / width;
+		offset.y_ -= 0.5f / height;
+	}
+	texAdjust.SetTranslation(offset);
+	texAdjust.SetScale(scale);
+
+	dest = texAdjust * shadowProj * shadowView;
+}
+
 void CalculateSpotMatrix(Matrix4& dest, Light* light)
 {
     Node* lightNode = light->GetNode();
@@ -185,6 +238,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
     Node* cameraNode = camera ? camera->GetNode() : nullptr;
     Light* light = lightQueue_ ? lightQueue_->light_ : nullptr;
     Texture2D* shadowMap = lightQueue_ ? lightQueue_->shadowMap_ : nullptr;
+	Texture2D* staticShadowMap = lightQueue_ ? lightQueue_->staticShadowMap_ : nullptr;
 
     // Set shaders first. The available shader parameters and their register/uniform positions depend on the currently set shaders
     graphics->SetShaders(vertexShader_, pixelShader_);
@@ -218,10 +272,11 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
         }
 
         // Use the "least filled" fill mode combined from camera & material
-        graphics->SetFillMode((FillMode)(Max(camera->GetFillMode(), material_->GetFillMode())));
-		graphics->SetDepthTest(pass_->GetDepthTestMode());
-		graphics->SetEnablePointSize(pass_->EnablePointSize());
+        graphics->SetFillMode((FillMode)Max(Max(camera->GetFillMode(), material_->GetFillMode()), overrideFillMode));
+        graphics->SetDepthTest(pass_->GetDepthTestMode());
         graphics->SetDepthWrite(pass_->GetDepthWrite() && allowDepthWrite);
+		graphics->SetEnablePointSize(pass_->EnablePointSize());
+		//graphics->SetDepthBias(pass_->GetDepthBiasConstantBias(), pass_->GetDepthBiasSlopeScaledBias());
     }
 
     // Set global (per-frame) shader parameters
@@ -238,6 +293,11 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
         view->SetCameraShaderParameters(camera);
         // During renderpath commands the G-Buffer or viewport texture is assumed to always be viewport-sized
         view->SetGBufferShaderParameters(viewSize, IntRect(0, 0, viewSize.x_, viewSize.y_));
+		graphics->SetShaderParameter("HasSnow", camera->IsSnowing());
+		graphics->SetShaderParameter("HasRain", camera->IsRaining());
+		
+		if(geometry_)
+			graphics->SetShaderParameter(VSP_POINTSCALEPERSP, geometry_->GetLodDistance());
     }
 
     // Set model or skinning transforms
@@ -304,6 +364,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
         }
 
         graphics->SetShaderParameter(PSP_FOGPARAMS, fogParams);
+		//graphics->SetShaderParameter(PSP_ISFOGGING, zone_->IsFogging());
     }
 
     // Set light-related shader parameters
@@ -362,6 +423,17 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
                     break;
                 }
             }
+			if (graphics->HasShaderParameter(VSP_STATICLIGHTMATRIX) && light->GetLightType() == LIGHT_DIRECTIONAL)
+			{
+				if (view->GetEnableStaticShadow() && lightQueue_->staticShadowMap_ &&
+					(lightQueue_->staticShadow_.shadowBatches_.sortedBatches_.Size() > 0 ||
+						lightQueue_->staticShadow_.shadowBatches_.sortedBatchGroups_.Size() > 0))
+				{
+					Matrix4 staticShadowMatrix;
+					CalculateDirectionalLightStaticShadowMatrix(staticShadowMatrix, lightQueue_, renderer);
+					graphics->SetShaderParameter(VSP_STATICLIGHTMATRIX, staticShadowMatrix.Data(), 16);
+				}
+			}
 
             float fade = 1.0f;
             float fadeEnd = light->GetDrawDistance();
@@ -378,7 +450,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
             graphics->SetShaderParameter(PSP_LIGHTPOS, lightPos);
             graphics->SetShaderParameter(PSP_LIGHTRAD, light->GetRadius());
             graphics->SetShaderParameter(PSP_LIGHTLENGTH, light->GetLength());
-
+			graphics->SetShaderParameter(PSP_NUMSPLITS, (int)Min(MAX_CASCADE_SPLITS, lightQueue_->shadowSplits_.Size()));
             if (graphics->HasShaderParameter(PSP_LIGHTMATRICES))
             {
                 switch (light->GetLightType())
@@ -422,7 +494,27 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
                     break;
                 }
             }
-
+			if (graphics->HasShaderParameter(PSP_STATICLIGHTMATRIX) && light->GetLightType() == LIGHT_DIRECTIONAL)
+			{
+				if (view->GetEnableStaticShadow() && lightQueue_->staticShadowMap_ &&
+				(lightQueue_->staticShadow_.shadowBatches_.sortedBatches_.Size() > 0 ||
+					lightQueue_->staticShadow_.shadowBatches_.sortedBatchGroups_.Size() > 0))
+				{
+					Matrix4 staticShadowMatrix;
+					CalculateDirectionalLightStaticShadowMatrix(staticShadowMatrix, lightQueue_, renderer);
+					graphics->SetShaderParameter(PSP_STATICLIGHTMATRIX, staticShadowMatrix.Data(), 16);
+				}
+			}
+			if (graphics->HasShaderParameter(PSP_ENABLESTATICSHADOW) && light->GetLightType() == LIGHT_DIRECTIONAL)
+			{
+				if (view->GetEnableStaticShadow())
+				{
+					graphics->SetShaderParameter(PSP_ENABLESTATICSHADOW, true);
+				} else
+				{
+					graphics->SetShaderParameter(PSP_ENABLESTATICSHADOW, false);
+				}
+			}
             // Set shadow mapping shader parameters
             if (shadowMap)
             {
@@ -597,11 +689,14 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
     // Set material-specific shader parameters and textures
     if (material_)
     {
-        if (graphics->NeedParameterUpdate(SP_MATERIAL, reinterpret_cast<const void*>(material_->GetShaderParameterHash())))
+        if (graphics->NeedParameterUpdate(SP_MATERIAL, reinterpret_cast<const void*>(material_->GetShaderParameterHash())) || renderer->GetOverrideShaderParametersSet() )
         {
             const HashMap<StringHash, MaterialShaderParameter>& parameters = material_->GetShaderParameters();
             for (HashMap<StringHash, MaterialShaderParameter>::ConstIterator i = parameters.Begin(); i != parameters.End(); ++i)
-                graphics->SetShaderParameter(i->first_, i->second_.value_);
+            {
+				graphics->SetShaderParameter(i->first_, i->second_.value_);
+            }
+			renderer->SetOverrideShaderParametersSet(false);
         }
 
         const HashMap<TextureUnit, SharedPtr<Texture> >& textures = material_->GetTextures();
@@ -617,6 +712,8 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
     {
         if (shadowMap && graphics->HasTextureUnit(TU_SHADOWMAP))
             graphics->SetTexture(TU_SHADOWMAP, shadowMap);
+		if (staticShadowMap && graphics->HasTextureUnit(TU_STATICSHADOWMAP))
+			graphics->SetTexture(TU_STATICSHADOWMAP, staticShadowMap);
         if (graphics->HasTextureUnit(TU_LIGHTRAMP))
         {
             Texture* rampTexture = light->GetRampTexture();
@@ -632,6 +729,14 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
             graphics->SetTexture(TU_LIGHTSHAPE, shapeTexture);
         }
     }
+	if(overrideShaderParameters_)
+	{
+		for (HashMap<StringHash, MaterialShaderParameter>::ConstIterator iter = overrideShaderParameters_->Begin(); iter != overrideShaderParameters_->End(); ++iter)
+		{
+			graphics->SetShaderParameter(iter->first_, iter->second_.value_);
+			renderer->SetOverrideShaderParametersSet(true);
+		}
+	}
 }
 
 void Batch::Draw(View* view, Camera* camera, bool allowDepthWrite) const

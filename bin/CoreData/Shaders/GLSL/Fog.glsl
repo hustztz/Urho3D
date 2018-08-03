@@ -11,14 +11,22 @@ vec3 GetLitFog(vec3 color, float fogFactor)
 
 float GetFogFactor(float depth)
 {
-    return clamp((cFogParams.x - depth) * cFogParams.y, 0.0, 1.0);
+	if(cIsFogging)
+		return clamp((cFogParams.x - depth) * cFogParams.y, 0.0, 1.0);
+	else
+		return 1.;
 }
 
 float GetHeightFogFactor(float depth, float height)
 {
-    float fogFactor = GetFogFactor(depth);
-    float heightFogFactor = (height - cFogParams.z) * cFogParams.w;
-    heightFogFactor = 1.0 - clamp(exp(-(heightFogFactor * heightFogFactor)), 0.0, 1.0);
-    return min(heightFogFactor, fogFactor);
+	if(cIsFogging)
+	{
+		float fogFactor = GetFogFactor(depth);
+		float heightFogFactor = (height - cFogParams.z) * cFogParams.w;
+		heightFogFactor = 1.0 - clamp(exp(-(heightFogFactor * heightFogFactor)), 0.0, 1.0);
+		return min(heightFogFactor, fogFactor);
+	}
+	else
+		return 1.;
 }
 #endif

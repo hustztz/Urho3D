@@ -17,8 +17,10 @@ uniform samplerCube sLightCubeMap;
     uniform sampler2D sLightBuffer;
     #ifdef VSM_SHADOW
         uniform sampler2D sShadowMap;
+		uniform sampler2D sStaticShadowMap;
     #else
         uniform sampler2DShadow sShadowMap;
+		uniform sampler2DShadow sStaticShadowMap;
     #endif
     uniform samplerCube sFaceSelectCubeMap;
     uniform samplerCube sIndirectionCubeMap;
@@ -26,6 +28,7 @@ uniform samplerCube sLightCubeMap;
     uniform sampler3D sZoneVolumeMap;
 #else
     uniform highp sampler2D sShadowMap;
+	uniform highp sampler2D sStaticShadowMap;
 #endif
 
 #ifdef GL3
@@ -79,6 +82,15 @@ float DecodeDepth(vec3 depth)
 
 float ReconstructDepth(float hwDepth)
 {
-    return dot(vec2(hwDepth, cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x)), cDepthReconstruct.zw);
+#ifdef LOGDEPTH
+	if(!cCameraOrthoPS)
+	{
+		float w = exp2(hwDepth * log2(1. + cFarClipPS)) - 1.;
+		return w/cFarClipPS;
+	}else
+		return dot(vec2(hwDepth, cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x)), cDepthReconstruct.zw);
+#else
+	return dot(vec2(hwDepth, cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x)), cDepthReconstruct.zw);
+#endif
 }
 #endif

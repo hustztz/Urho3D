@@ -356,7 +356,6 @@ void AnimatedModel::SetModel(Model* model, bool createBones)
         const PODVector<Vector3>& geometryCenters = model->GetGeometryCenters();
         for (unsigned i = 0; i < geometries.Size(); ++i)
         {
-            geometries_[i] = geometries[i];
             geometryData_[i].center_ = geometryCenters[i];
         }
 
@@ -1130,11 +1129,11 @@ void AnimatedModel::CloneGeometries()
     }
 
     // Geometries will always be cloned fully. They contain only references to buffer, so they are relatively light
-    for (unsigned i = 0; i < geometries_.Size(); ++i)
+    for (unsigned i = 0; i < model_->GetNumGeometries(); ++i)
     {
-        for (unsigned j = 0; j < geometries_[i].Size(); ++j)
+        for (unsigned j = 0; j < model_->GetNumGeometryLodLevels(i); ++j)
         {
-            SharedPtr<Geometry> original = geometries_[i][j];
+           const Geometry* original = model_->GetGeometry(i, j);
             SharedPtr<Geometry> clone(new Geometry(context_));
 
             // Add an additional vertex stream into the clone, which supplies only the morphable vertex data, while the static
@@ -1169,7 +1168,7 @@ void AnimatedModel::CloneGeometries()
             clone->SetDrawRange(original->GetPrimitiveType(), original->GetIndexStart(), original->GetIndexCount());
             clone->SetLodDistance(original->GetLodDistance());
 
-            geometries_[i][j] = clone;
+			model_->SetGeometry(i, j, clone);
         }
     }
 

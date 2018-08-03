@@ -40,7 +40,8 @@ namespace Urho3D
 Viewport::Viewport(Context* context) :
     Object(context),
     rect_(IntRect::ZERO),
-    drawDebug_(true)
+    drawDebug_(true),
+	enableStaticShadow_(false)
 {
     SetRenderPath((RenderPath*)nullptr);
 }
@@ -50,7 +51,8 @@ Viewport::Viewport(Context* context, Scene* scene, Camera* camera, RenderPath* r
     scene_(scene),
     camera_(camera),
     rect_(IntRect::ZERO),
-    drawDebug_(true)
+    drawDebug_(true),
+	enableStaticShadow_(false)
 {
     SetRenderPath(renderPath);
 }
@@ -60,7 +62,8 @@ Viewport::Viewport(Context* context, Scene* scene, Camera* camera, const IntRect
     scene_(scene),
     camera_(camera),
     rect_(rect),
-    drawDebug_(true)
+    drawDebug_(true),
+	enableStaticShadow_(false)
 {
     SetRenderPath(renderPath);
 }
@@ -215,16 +218,32 @@ void Viewport::AllocateView()
 
 void Viewport::AddFilter(Filter* filter)
 {
-
+	
 	HashMap<String, SharedPtr<Filter> >::Iterator iter = filters_.Find(filter->GetTypeName());
 	if (iter == filters_.End())
 	{
 		filters_.Insert(MakePair(filter->GetTypeName(), SharedPtr<Filter>(filter)));
 		filter->SetEnable(true);
-	}
-	else
+	} else
 	{
 		URHO3D_LOGINFO("ViewPort has contained" + filter->GetTypeName());
 	}
 }
+
+	void Viewport::EnableStaticShadow(bool enableStaticShadow)
+	{
+		if (!GetView())
+			AllocateView();
+		enableStaticShadow_ = enableStaticShadow;
+		GetView()->EnableStaticShadow(enableStaticShadow);
+		if(enableStaticShadow_)
+			GetView()->UpdateStaticShadow();
+	}
+
+	void Viewport::UpdateStaticShadow()
+	{
+		if (!GetView())
+			AllocateView();
+		GetView()->UpdateStaticShadow();
+	}
 }

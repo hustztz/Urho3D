@@ -1,6 +1,7 @@
 #include "Uniforms.glsl"
 #include "Samplers.glsl"
 #include "Transform.glsl"
+#include "PostProcess.glsl"
 
 varying vec3 vTexCoord;
 
@@ -9,13 +10,18 @@ varying vec3 vTexCoord;
 uniform float cRatio;
 uniform float cCloudsMoveSpeed;
 uniform float cCloudsChangeSpeed;
+uniform vec3 cSunDir;
+uniform vec3 cSunSpeedDir;
+uniform float cHour;
+uniform vec3 cIndirectColor;
 	
 //stamophere
 const float pi = 3.14159265359;
 const float zenithOffset = 0.0;
 const float multiScatterPhase = 0.1;
 const float density = 0.7;
-const vec3 skyColor = vec3(0.39, 0.57, 1.0); //Make sure one of the conponents is never 0.0
+//const vec3 skyColor = vec3(0.39, 0.57, 1.0); //Make sure one of the conponents is never 0.0
+const vec3 skyColor = vec3(0.20, 0.37, 1.0); //Make sure one of the conponents is never 0.0
 
 //cloud
 const float timeScale = 20.0;
@@ -25,13 +31,16 @@ const float softness = 0.2;
 const float brightness = 1.0;
 const int noiseOctaves = 8;
 const float curlStrain = 3.0;
-	
+
 float greatCircleDist(vec2 p, vec2 lp)
 {
     float phi_1 = p.y;
     float phi_2 = lp.y;
     float delta_lambda = p.x-lp.x;
-    return acos(sin(phi_1)*sin(phi_2) + cos(phi_1)*cos(phi_2)*cos(delta_lambda));
+	//float delta = 0.001;
+	//if( dot(vec2(phi_1-phi_2, delta_lambda), vec2(phi_1-phi_2, delta_lambda)) <= delta*delta)
+	//	return delta;
+	return acos(sin(phi_1)*sin(phi_2) + cos(phi_1)*cos(phi_2)*cos(delta_lambda));
 }
 
 float  zenithDensity(float x)
@@ -43,14 +52,53 @@ float  zenithDensity(float x)
 vec3 getSkyAbsorption(vec3 x, float y){
 	
 	vec3 absorption = x * -y;
-	     absorption = exp2(absorption) * 2.0;
+	absorption = exp2(absorption) * 2.0;
 	
 	return absorption;
 }
 
 float getSunPoint(vec2 p, vec2 lp){
     float dist = greatCircleDist(p, lp)/pi*2.;
-	return smoothstep(0.03, 0.026, dist) * 50.0;
+	return (1.-smoothstep(0.026, 0.03, dist)) * 50.0;
+}
+const float moonRadius = 0.05;
+vec2 rotate_direction(vec2 Dir, vec2 CosSin)
+{
+    return vec2(Dir.x*CosSin.x - Dir.y*CosSin.y, 
+                  Dir.x*CosSin.y + Dir.y*CosSin.x);
+}
+vec3 getMoonPoint(vec2 lp, vec3 p3, vec3 lp3)
+{
+	if(cHour >= 6. && cHour <= 18.)
+		return vec3(0.);
+	if(p3.y < 0)
+		return vec3(0.);
+	float dist = length(p3-lp3);
+	if(dist < moonRadius)
+	{
+		vec3 p2lp = (p3-lp3);
+		vec3 pTangent = normalize(cSunSpeedDir);
+		//if(cross(pTangent, lp3).y < 0)
+		//	pTangent *= -1.;
+		vec3 p2lpVTangent = normalize(p2lp - pTangent*dot(p2lp,pTangent));
+		if(dot(cross(lp3, pTangent),p2lpVTangent) < 0)
+			p2lpVTangent *= -1.;
+		float sin = dot(p2lp,pTangent)/ dist;
+		float cos = dot(p2lp,p2lpVTangent)/dist;
+		vec2 cossin = vec2(cos, sin);
+		vec2 texCoord = cossin*dist/moonRadius * 0.5 + 0.5;
+		return texture2D(sNormalMap, texCoord).rgb * 0.5;
+	}
+	return vec3(0.);
+}
+
+vec3 getStarts(vec2 uv, vec3 lp)
+{
+	if(cHour >= 6. && cHour <= 18.)
+		return vec3(0.);
+	if(lp.y < 0)
+		return vec3(0.);
+	return texture2D(sSpecMap, uv).rgb*1.4;
 }
 
 
@@ -74,18 +122,31 @@ vec3 getAtmosphericScattering(vec2 p, vec2 lp)
 	float sunPointDistMult =  clamp(length(max(lp.y + multiScatterPhase - zenithOffset, 0.0)), 0.0, 1.0);
 	
 	float rayleighMult = getRayleigMultiplier(p, lp);
+	vec3 skyColorCopy = skyColor;
+	if(cHour < 6. || cHour > 18.)
+	{
+		float attention = mix(1., 1./4., clamp((6.-cHour)/0.1, 0., 1.)+clamp((cHour-18.)/0.1, 0., 1.));
+		skyColorCopy *= attention;
+	}
+	vec3 absorption = getSkyAbsorption(skyColorCopy, zenith);
+	vec3 sky = vec3(0.);
 	
-	vec3 absorption = getSkyAbsorption(skyColor, zenith);
-    vec3 sunAbsorption = getSkyAbsorption(skyColor, zenithDensity(lp.y + multiScatterPhase));
-	vec3 sky = skyColor * zenith * rayleighMult;
-	vec3 sun = getSunPoint(p, lp) * absorption;
-	vec3 mie = getMie(p, lp) * sunAbsorption;
-	
-	vec3 totalSky = mix(sky * absorption, sky / (sky + 0.5), sunPointDistMult);
-    totalSky += sun + mie;
-	totalSky *= sunAbsorption * 0.5 + 0.5 * length(sunAbsorption);
-	totalSky *= 0.7;
-	
+	vec3 totalSky = vec3(0.);
+    if(cHour < 6. || cHour > 18.)
+	{
+		sky = skyColorCopy;
+		totalSky = mix(sky * absorption, sky / (sky + 0.5), sunPointDistMult);
+	}
+	else{
+		sky = skyColorCopy * zenith * rayleighMult;
+		totalSky = mix(sky * absorption, sky / (sky + 0.5), sunPointDistMult);
+		vec3 sunAbsorption = getSkyAbsorption(skyColorCopy, zenithDensity(lp.y + multiScatterPhase));
+		vec3 sun = getSunPoint(p, lp) * absorption;
+		vec3 mie = getMie(p, lp) * sunAbsorption;
+    	totalSky += (sun + mie)*0.06;
+		totalSky *= sunAbsorption * 0.5 + 0.5 * length(sunAbsorption);
+	}
+	totalSky *= 0.5;
 	return totalSky;
 }
 
@@ -143,37 +204,27 @@ float fbm(vec2 uv) {
 
 vec4 getCloudColor(vec2 texCoord, float y, vec3 sunCol)
 {
-    vec2 uv = texCoord / cGBufferInvSize / (500000.0 * cloudScale);
+    vec2 uv = texCoord / cGBufferInvSize / (250000.0 * cloudScale);
 
-	float cover = -cRatio*0.6+0.8;
+	float cover = -cRatio*0.6+0.6;
 
 	float bright = brightness * (0.1 + cRatio);
 
 	float color1 = fbm(uv - 0.5 + cElapsedTimePS * cCloudsMoveSpeed * 0.00004 * timeScale);
 	float color2 = fbm(uv - 10.5 + cElapsedTimePS * cCloudsMoveSpeed * 0.00002 * timeScale);
 
-	float clouds1 = smoothstep( cover, min(( cover ) + softness * 2.0, 1.0), color1);
-	float clouds2 = smoothstep( cover, min(( cover ) + softness, 1.0), color2);
+	float clouds1 = smoothstep( cover, min(( cover ) + softness * 5.0, 1.0), color1);
+	float clouds2 = smoothstep( cover, min(( cover ) + softness * 2.0 , 1.0), color2);
 
-	float cloudsFormComb = clamp((clouds1+clouds2)/2.*bright, 0., 1.) * smoothstep(0., 0.1, y);//pow(clamp((clouds1+clouds2)/2.*bright, 0., 1.), clamp(-0.8*cRatio+0.71, 0.001, 1.));
+	float cloudsFormComb = clamp((clouds1+clouds2)/2.*bright, 0., 1.) * smoothstep(0., 0.1, y);
 	
-	//float cloudCol = saturate(saturate(1.0 - pow(color1, 1.0) * 0.2) * bright);
-	//vec4 clouds1Color = vec4(cloudCol, cloudCol, cloudCol, 1.0);
-	//vec4 clouds2Color = mix(clouds1Color, skyCol, 0.25);
-	//vec4 cloudColComb = mix(clouds1Color, clouds2Color, saturate(clouds2 - clouds1));
+	float bAttenuation = 0.4 * (1.1 - cRatio) * ( 1.4 - cloudsFormComb);
+	vec3 cloudColor = clamp( vec3(sunCol.rgb * bAttenuation), 0., 10.);
 	
-	//vec3 cloudColor = clamp(mix(sunCol*0.3, vec3(1.), cloudsFormComb), 0., 10.);
-	vec3 cloudColor = clamp( sunCol * 0.7 * pow(2., -7.*cloudsFormComb) , 0., 10.);
-	return vec4( cloudColor, cloudsFormComb);
-
-	/*float distToCenter = 1. - pow(distance(texCoord, vec2(0.5)) / 0.5, 1.2);
-	//	distToCenter = pow(distToCenter, 1.);
-	//cloudColComb.a *= distToCenter;
-	//vec4 cloudColor;
+	vec3 monochromeCloudColor = vec3(max(max(cloudColor.r,cloudColor.b),cloudColor.g));
+	cloudColor = mix( cloudColor, monochromeCloudColor, vec3(cRatio));
 	
-	//cloudColor = mix(skyCol, cloudColComb, cloudsFormComb);
-
-	//return cloudColor.rgb;*/
+	return vec4(cloudColor, cloudsFormComb + cRatio * 0.1);
 }
 #endif
 
@@ -194,15 +245,14 @@ void PS()
    // #endif
   //  gl_FragColor = sky;
 	vec2 position = toSkyPosition(vTexCoord);
-	vec2 lightPosition = toSkyPosition(vec3(-1., 0.5, -0.));
+	vec2 lightPosition = toSkyPosition(cSunDir);
 	vec3 atmosphereColor = getAtmosphericScattering(position, lightPosition) * pi;
-#ifndef HDRSCALE
-	atmosphereColor.rgb = jodieReinhardTonemap(atmosphereColor.rgb);
-    atmosphereColor.rgb = pow(atmosphereColor.rgb, vec3(2.2)); //Back to linear
-#endif
+	vec3 moonColor= getMoonPoint(lightPosition, normalize(vTexCoord), normalize(cSunDir));
+	atmosphereColor += moonColor;
 	vec3 dir = normalize(vTexCoord);
 	vec2 dirSkyPos = toSkyPosition(dir);
 	vec2 dirProj = dir.xz/pow(0.2 + (dot(vec3(0.,1.,0.),dir)), 0.4);
+	dirProj = dirProj*0.5 + 0.5;
 	//vec2 dirProj;
 	//float cos1 = cos(dirSkyPos.x);
 	//float sin1 = sin(dirSkyPos.x);
@@ -213,14 +263,23 @@ void PS()
 	//dirProj.y = acos(-cos2*sin1/sqrt(1.-cos2*cos2*cos1*cos1))*sqrt(1.-cos2*cos2*cos1*cos1);
 	//dirProj.x = acos(cos2*cos1);
 	//dirProj.y = asin(-cos2*sin1);
-	vec3 sunColor = getAtmosphericScattering(lightPosition, lightPosition) * pi;
+	if(moonColor.r <= 0.)
+		atmosphereColor += getStarts(dirProj, dir);
+		
+#ifndef HDRSCALE
+	atmosphereColor = jodieReinhardTonemap(atmosphereColor);
+    atmosphereColor = pow(atmosphereColor, vec3(2.2)); //Back to linear
+	//float lum = 0.6;
+    //gl_FragColor.rgb = Uncharted2Tonemap(gl_FragColor.rgb) / Uncharted2Tonemap(vec3(lum*5.));
+#endif
+	vec3 sunColor = cIndirectColor;
 	vec4 cloudColor = getCloudColor(dirProj, dir.y, sunColor);
 #ifndef HDRSCALE
-	cloudColor.rgb = jodieReinhardTonemap(cloudColor.rgb);
+	cloudColor.rgb = jodieReinhardTonemap(cloudColor.rgb * 10.);
     cloudColor.rgb = pow(cloudColor.rgb, vec3(2.2)); //Back to linear
+	//float lum = 0.6;
+    //gl_FragColor.rgb = Uncharted2Tonemap(gl_FragColor.rgb) / Uncharted2Tonemap(vec3(lum*5.));
 #endif	
-	gl_FragColor.rgb = mix(atmosphereColor, cloudColor.rgb, clamp(cloudColor.a, 0., 1.));
-	
+	gl_FragColor.rgb = mix(atmosphereColor, cloudColor.rgb, clamp(cloudColor.a, 0., 1.));	
 
-	 
 }

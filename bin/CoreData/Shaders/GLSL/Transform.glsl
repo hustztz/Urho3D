@@ -78,7 +78,24 @@ float GetDepth(vec4 clipPos)
 #ifdef BILLBOARD
 vec3 GetBillboardPos(vec4 iPos, vec2 iSize, mat4 modelMatrix)
 {
-    return (iPos * modelMatrix).xyz + vec3(iSize.x, iSize.y, 0.0) * cBillboardRot;
+	if(length(cBillboardRot[0]) > 0.)
+		return (iPos * modelMatrix).xyz + vec3(iSize.x, iSize.y, 0.0) * cBillboardRot;
+	else
+	{
+		vec3 billPos = (iPos * modelMatrix).xyz;
+		vec3 bill2Cam = (cCameraPos - billPos);
+		bill2Cam.y = 0.;
+		bill2Cam = normalize(bill2Cam);
+		float cos = dot(vec3(0., 0., 1.), bill2Cam);
+		float sin;
+		if(bill2Cam.x>0.)
+			sin = sqrt(1. - cos*cos);
+		else
+			sin = -sqrt(1. - cos*cos);
+	
+		mat3 rotateY = mat3(vec3(cos, 0., sin), vec3(0., 1. ,0.), vec3(-sin, 0., cos));
+		return billPos + vec3(iSize.x, iSize.y, 0.0) * rotateY;
+	}
 }
 
 vec3 GetBillboardNormal()

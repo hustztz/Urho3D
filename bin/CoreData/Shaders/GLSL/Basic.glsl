@@ -8,13 +8,18 @@
 #ifdef VERTEXCOLOR
     varying vec4 vColor;
 #endif
+#ifdef LOGDEPTH
+varying float positionW;
+#endif
 
 void VS()
 {
     mat4 modelMatrix = iModelMatrix;
     vec3 worldPos = GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
-    
+#ifdef LOGDEPTH
+	positionW = gl_Position.w;
+#endif	
     #ifdef DIFFMAP
         vTexCoord = iTexCoord;
     #endif
@@ -25,6 +30,10 @@ void VS()
 
 void PS()
 {
+#ifdef LOGDEPTH
+	if(!cCameraOrthoPS)
+		gl_FragDepth = log2(1. + positionW)/log2(1. + cFarClipPS);
+#endif
     vec4 diffColor = cMatDiffColor;
 
     #ifdef VERTEXCOLOR

@@ -3254,6 +3254,7 @@ void Graphics::SetTextureUnitMappings()
     textureUnits_["AlbedoBuffer"] = TU_ALBEDOBUFFER;
     textureUnits_["NormalMap"] = TU_NORMAL;
     textureUnits_["NormalBuffer"] = TU_NORMALBUFFER;
+	textureUnits_["NormalLookUpTable"] = TU_NORMALTABLE;
     textureUnits_["SpecMap"] = TU_SPECULAR;
     textureUnits_["EmissiveMap"] = TU_EMISSIVE;
     textureUnits_["EnvMap"] = TU_ENVIRONMENT;
@@ -3262,6 +3263,7 @@ void Graphics::SetTextureUnitMappings()
     textureUnits_["LightSpotMap"] = TU_LIGHTSHAPE;
     textureUnits_["LightCubeMap"] = TU_LIGHTSHAPE;
     textureUnits_["ShadowMap"] = TU_SHADOWMAP;
+	textureUnits_["StaticShadowMap"] = TU_STATICSHADOWMAP;
 #ifndef GL_ES_VERSION_2_0
     textureUnits_["VolumeMap"] = TU_VOLUMEMAP;
     textureUnits_["FaceSelectCubeMap"] = TU_FACESELECT;

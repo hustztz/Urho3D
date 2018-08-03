@@ -1,0 +1,3 @@
+<technique vs="Billboard" ps="Billboard" vsdefines="DIFFMAP" psdefines="DIFFMAP">
+    <pass name="alpha" depthwrite="false" blend="alpha" cull="none" />
+</technique>

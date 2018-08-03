@@ -58,6 +58,7 @@ ParticleEffect::ParticleEffect(Context* context) :
     numParticles_(DEFAULT_NUM_PARTICLES),
     updateInvisible_(false),
     relative_(true),
+	onlyFollowPosition_(false),
     scaled_(true),
     sorted_(false),
     fixedScreenSize_(false),
@@ -133,6 +134,7 @@ bool ParticleEffect::Load(const XMLElement& source)
     numParticles_ = DEFAULT_NUM_PARTICLES;
     updateInvisible_ = false;
     relative_ = true;
+	onlyFollowPosition_ = false;
     scaled_ = true;
     sorted_ = false;
     fixedScreenSize_ = false;
@@ -185,6 +187,8 @@ bool ParticleEffect::Load(const XMLElement& source)
 
     if (source.HasChild("relative"))
         relative_ = source.GetChild("relative").GetBool("enable");
+	if (source.HasChild("onlyfollowposition"))
+		onlyFollowPosition_ = source.GetChild("onlyfollowposition").GetBool("enable");
 
     if (source.HasChild("scaled"))
         scaled_ = source.GetChild("scaled").GetBool("enable");
@@ -343,6 +347,9 @@ bool ParticleEffect::Save(XMLElement& dest) const
     childElem = dest.CreateChild("relative");
     childElem.SetBool("enable", relative_);
 
+	childElem = dest.CreateChild("onlyfollowposition");
+	childElem.SetBool("enable", onlyFollowPosition_);
+
     childElem = dest.CreateChild("scaled");
     childElem.SetBool("enable", scaled_);
 
@@ -452,6 +459,11 @@ void ParticleEffect::SetUpdateInvisible(bool enable)
 void ParticleEffect::SetRelative(bool enable)
 {
     relative_ = enable;
+}
+
+void ParticleEffect::SetOnlyFollowPosiont(bool enable)
+{
+	onlyFollowPosition_ = enable;
 }
 
 void ParticleEffect::SetScaled(bool enable)
@@ -739,6 +751,7 @@ SharedPtr<ParticleEffect> ParticleEffect::Clone(const String& cloneName) const
     ret->numParticles_ = numParticles_;
     ret->updateInvisible_ = updateInvisible_;
     ret->relative_ = relative_;
+	ret->onlyFollowPosition_ = onlyFollowPosition_;
     ret->scaled_ = scaled_;
     ret->sorted_ = sorted_;
     ret->fixedScreenSize_ = fixedScreenSize_;

@@ -45,6 +45,7 @@
 #include "../Graphics/Terrain.h"
 #include "../Graphics/TerrainPatch.h"
 #include "../Graphics/LodModel.h"
+#include "../Graphics/BIHTree.h"
 #ifdef _WIN32
 #include "../Graphics/Texture2D.h"
 #endif
@@ -62,6 +63,8 @@
 #include <SDL/SDL.h>
 
 #include "../DebugNew.h"
+#include "../Graphics/Effects/DayNightWeatherControl.h"
+#include "../Graphics/Billboard.h"
 
 namespace Urho3D
 {
@@ -437,6 +440,9 @@ void RegisterGraphicsLibrary(Context* context)
 	ambergris::PointCloudEngine::AgVoxelLidarPoints::RegisterObject(context);
 	ambergris::PointCloudEngine::AgVoxelTerrestialPoints::RegisterObject(context);
 	ambergris::PointCloudEngine::AgPointCloudOptions::RegisterObject(context);
+	DayNightWeatherControl::RegisterObject(context);
+	BillboardDrawable::RegisterObject(context);
+	BillboardGUIDrawable::RegisterObject(context);
 }
 
 }

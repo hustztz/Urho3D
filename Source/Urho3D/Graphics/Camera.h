@@ -209,6 +209,14 @@ public:
     void SetClipPlaneAttr(const Vector4& value);
     /// Return clipping plane attribute.
     Vector4 GetClipPlaneAttr() const;
+	/// 设置是否开始下雨
+	void SetIsRaining(bool enable);
+	/// 返回是否正在下雨
+	bool IsRaining(){ return isRainning_; }
+	/// 设置是否开始下雪
+	void SetIsSnowing(bool enable);
+	/// 返回是否正在下雪
+	bool IsSnowing(){ return isSnowing_; }
 
 protected:
     /// Handle node being assigned.
@@ -276,6 +284,10 @@ private:
     bool useClipping_;
     /// Use custom projection matrix flag. Used internally.
     mutable bool customProjection_;
+	/// 是否开始下雪
+	bool isSnowing_;
+	/// 是否开始下雨
+	bool isRainning_;
 };
 
 }

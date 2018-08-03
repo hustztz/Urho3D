@@ -53,7 +53,8 @@ ParticleEmitter::ParticleEmitter(Context* context) :
     needUpdate_(false),
     serializeParticles_(true),
     sendFinishedEvent_(true),
-    autoRemove_(REMOVE_DISABLED)
+    autoRemove_(REMOVE_DISABLED),
+	onlyFollowPosition_(false)
 {
     SetNumParticles(DEFAULT_NUM_PARTICLES);
 }
@@ -343,6 +344,7 @@ void ParticleEmitter::ApplyEffect()
     SetMaterial(effect_->GetMaterial());
     SetNumParticles(effect_->GetNumParticles());
     SetRelative(effect_->IsRelative());
+	SetOnlyFollowPosion(effect_->IsOnlyFollowPosition());
     SetScaled(effect_->IsScaled());
     SetSorted(effect_->IsSorted());
     SetFixedScreenSize(effect_->IsFixedScreenSize());
@@ -435,6 +437,11 @@ VariantVector ParticleEmitter::GetParticleBillboardsAttr() const
     return ret;
 }
 
+void ParticleEmitter::SetOnlyFollowPosion(bool enable)
+{
+	onlyFollowPosition_ = enable;
+}
+
 void ParticleEmitter::OnSceneSet(Scene* scene)
 {
     BillboardSet::OnSceneSet(scene);
@@ -501,8 +508,14 @@ bool ParticleEmitter::EmitNewParticle()
 
     if (!relative_)
     {
-        startPos = node_->GetWorldTransform() * startPos;
-        startDir = node_->GetWorldRotation() * startDir;
+		if (!onlyFollowPosition_)
+		{
+			startPos = node_->GetWorldTransform() * startPos;
+			startDir = node_->GetWorldRotation() * startDir;
+		} else
+		{
+			startPos += node_->GetWorldPosition();
+		}
     };
 
     particle.velocity_ = effect_->GetRandomVelocity() * startDir;

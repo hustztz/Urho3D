@@ -151,6 +151,27 @@ public:
     Frustum frustum_;
 };
 
+/// 查询出所有静态或动态的阴影投射体.
+class URHO3D_API AllCastersQuery : public OctreeQuery
+{
+public:
+	/// Construct with frustum and query parameters.
+	AllCastersQuery(PODVector<Drawable*>& result, DynamicType dynamicType, unsigned char drawableFlags = DRAWABLE_ANY,
+		unsigned viewMask = DEFAULT_VIEWMASK) :
+		OctreeQuery(result, drawableFlags, viewMask),
+		dynamicType_(dynamicType)
+	{
+	}
+
+	/// Intersection test for an octant.
+	Intersection TestOctant(const BoundingBox& box, bool inside) override;
+	/// Intersection test for drawables.
+	void TestDrawables(Drawable** start, Drawable** end, bool inside) override;
+
+	DynamicType dynamicType_;
+
+};
+
 /// General octree query result. Used for Lua bindings only.
 struct URHO3D_API OctreeQueryResult
 {

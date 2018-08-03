@@ -1,0 +1,10 @@
+<renderpath>	
+	<command type="quad" tag="ssao" vs="SSAO" ps="SSAO" output="viewport">
+		<texture unit="diffuse" name="viewport" />
+		<texture unit="depth" name="depth" />
+		<parameter name="R" value="0.05" />
+		<parameter name="F" value="50.0" />
+		<parameter name="Kz" value="500.0" />
+		<parameter name="B_REF" value="0" />
+    </command>
+</renderpath>

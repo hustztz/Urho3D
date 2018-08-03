@@ -330,17 +330,20 @@ enum TextureUnit
     TU_LIGHTRAMP = 8,
     TU_LIGHTSHAPE = 9,
     TU_SHADOWMAP = 10,
+	TU_STATICSHADOWMAP = 11,
     TU_FACESELECT = 11,
     TU_INDIRECTION = 12,
     TU_DEPTHBUFFER = 13,
     TU_LIGHTBUFFER = 14,
     TU_ZONE = 15,
+	TU_NORMALTABLE = 16,
     MAX_MATERIAL_TEXTURE_UNITS = 8,
-    MAX_TEXTURE_UNITS = 16
+    MAX_TEXTURE_UNITS = 17
 #else
     TU_LIGHTRAMP = 5,
     TU_LIGHTSHAPE = 6,
     TU_SHADOWMAP = 7,
+	TU_STATICSHADOWMAP = 6,
     MAX_MATERIAL_TEXTURE_UNITS = 5,
     MAX_TEXTURE_UNITS = 8
 #endif
@@ -356,6 +359,7 @@ enum FaceCameraMode
     FC_LOOKAT_Y,
     FC_LOOKAT_MIXED,
     FC_DIRECTION,
+	FC_ALL_BILLBOARDES_ROTATE_Y,
 };
 
 /// Shadow type.
@@ -378,6 +382,7 @@ extern URHO3D_API const StringHash VSP_CLIPPLANE;
 extern URHO3D_API const StringHash VSP_NEARCLIP;
 extern URHO3D_API const StringHash VSP_FARCLIP;
 extern URHO3D_API const StringHash VSP_DEPTHMODE;
+extern URHO3D_API const StringHash VSP_CAMERAORTHO;
 extern URHO3D_API const StringHash VSP_DELTATIME;
 extern URHO3D_API const StringHash VSP_ELAPSEDTIME;
 extern URHO3D_API const StringHash VSP_FRUSTUMSIZE;
@@ -393,8 +398,10 @@ extern URHO3D_API const StringHash VSP_UOFFSET;
 extern URHO3D_API const StringHash VSP_VOFFSET;
 extern URHO3D_API const StringHash VSP_ZONE;
 extern URHO3D_API const StringHash VSP_LIGHTMATRICES;
+extern URHO3D_API const StringHash VSP_STATICLIGHTMATRIX;
 extern URHO3D_API const StringHash VSP_SKINMATRICES;
 extern URHO3D_API const StringHash VSP_VERTEXLIGHTS;
+extern URHO3D_API const StringHash VSP_POINTSCALEPERSP;
 extern URHO3D_API const StringHash PSP_AMBIENTCOLOR;
 extern URHO3D_API const StringHash PSP_CAMERAPOS;
 extern URHO3D_API const StringHash PSP_DELTATIME;
@@ -402,6 +409,7 @@ extern URHO3D_API const StringHash PSP_DEPTHRECONSTRUCT;
 extern URHO3D_API const StringHash PSP_ELAPSEDTIME;
 extern URHO3D_API const StringHash PSP_FOGCOLOR;
 extern URHO3D_API const StringHash PSP_FOGPARAMS;
+extern URHO3D_API const StringHash PSP_ISFOGGING;
 extern URHO3D_API const StringHash PSP_GBUFFERINVSIZE;
 extern URHO3D_API const StringHash PSP_LIGHTCOLOR;
 extern URHO3D_API const StringHash PSP_LIGHTDIR;
@@ -419,6 +427,9 @@ extern URHO3D_API const StringHash PSP_SHADOWINTENSITY;
 extern URHO3D_API const StringHash PSP_SHADOWMAPINVSIZE;
 extern URHO3D_API const StringHash PSP_SHADOWSPLITS;
 extern URHO3D_API const StringHash PSP_LIGHTMATRICES;
+extern URHO3D_API const StringHash PSP_STATICLIGHTMATRIX;
+extern URHO3D_API const StringHash PSP_ENABLESTATICSHADOW;
+extern URHO3D_API const StringHash PSP_NUMSPLITS;
 extern URHO3D_API const StringHash PSP_VSMSHADOWPARAMS;
 extern URHO3D_API const StringHash PSP_ROUGHNESS;
 extern URHO3D_API const StringHash PSP_METALLIC;
@@ -426,6 +437,7 @@ extern URHO3D_API const StringHash PSP_LIGHTRAD;
 extern URHO3D_API const StringHash PSP_LIGHTLENGTH;
 extern URHO3D_API const StringHash PSP_ZONEMIN;
 extern URHO3D_API const StringHash PSP_ZONEMAX;
+extern URHO3D_API const StringHash PSP_CAMERAORTHO;
 
 // Scale calculation from bounding box diagonal.
 extern URHO3D_API const Vector3 DOT_SCALE;

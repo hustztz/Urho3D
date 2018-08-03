@@ -146,11 +146,11 @@
             }
             else
             {
-                vec3 fresnelTerm = Fresnel(specColor, vdh, ldh) ;
+                vec3 fresnelTerm = Fresnel(specColor, vdh, ldh);
                 float distTerm = Distribution(ndh, roughness);
                 float visTerm = Visibility(ndl, ndv, roughness);
 
-                specularFactor = fresnelTerm * distTerm * visTerm  / M_PI;
+                specularFactor = fresnelTerm * distTerm * visTerm;
                 return diffuseFactor + specularFactor;
             }
         #endif

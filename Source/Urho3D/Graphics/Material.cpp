@@ -961,17 +961,20 @@ void Material::SetShaderParameter(const String& name, const Variant& value)
 
     if (nameHash == PSP_MATSPECCOLOR)
     {
+		/// 这里是为了配合下雨时调整高光，specular_为false后，高光就加不上了，会对性能有轻微影响
         VariantType type = value.GetType();
         if (type == VAR_VECTOR3)
         {
-            const Vector3& vec = value.GetVector3();
-            specular_ = vec.x_ > 0.0f || vec.y_ > 0.0f || vec.z_ > 0.0f;
+//            const Vector3& vec = value.GetVector3();
+//            specular_ = vec.x_ > 0.0f || vec.y_ > 0.0f || vec.z_ > 0.0f;
+			specular_ = true;
         }
         else if (type == VAR_VECTOR4)
         {
-            const Vector4& vec = value.GetVector4();
-            specular_ = vec.x_ > 0.0f || vec.y_ > 0.0f || vec.z_ > 0.0f;
-        }
+//            const Vector4& vec = value.GetVector4();
+//            specular_ = vec.x_ > 0.0f || vec.y_ > 0.0f || vec.z_ > 0.0f;
+			specular_ = true;
+		}
     }
 
     if (!batchedParameterUpdate_)
@@ -1202,7 +1205,7 @@ Texture* Material::GetTexture(TextureUnit unit) const
 
 const Variant& Material::GetShaderParameter(const String& name) const
 {
-    HashMap<StringHash, MaterialShaderParameter>::ConstIterator i = shaderParameters_.Find(name);
+    HashMap<StringHash, MaterialShaderParameter>::ConstIterator i = shaderParameters_.Find(StringHash(name));
     return i != shaderParameters_.End() ? i->second_.value_ : Variant::EMPTY;
 }
 

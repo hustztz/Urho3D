@@ -1,0 +1,4 @@
+<material>
+    <technique name="Techniques/DiffLitParticleAlphaOnlyLitAlpha.xml" />
+    <texture unit="diffuse" name="Textures/rain.png" />
+</material>

@@ -81,7 +81,9 @@ struct ScenePassInfo
 {
     /// Pass index.
     unsigned passIndex_;
-    /// Allow instancing flag.
+	///Pass name, 用于索引drawable的separatePass_
+	String passName_;
+	/// Allow instancing flag.
     bool allowInstancing_;
     /// Mark to stencil flag.
     bool markToStencil_;
@@ -195,6 +197,11 @@ public:
     /// Get a named texture from the rendertarget list or from the resource cache, to be either used as a rendertarget or texture binding.
     Texture* FindNamedTexture(const String& name, bool isRenderTarget, bool isVolumeMap = false);
 
+	void EnableStaticShadow(bool enableStaticShadow) { enableStaticShadow_ = enableStaticShadow; }
+	bool GetEnableStaticShadow() { return enableStaticShadow_; }
+	void UpdateStaticShadow() { updateStaticShadow_ = true; }
+	bool GetUpdateStaticShadow() { return updateStaticShadow_; }
+
 private:
     /// Query the octree for drawable objects.
     void GetDrawables();
@@ -242,6 +249,8 @@ private:
     void SetupShadowCameras(LightQueryResult& query);
     /// Set up a directional light shadow camera
     void SetupDirLightShadowCamera(Camera* shadowCamera, Light* light, float nearSplit, float farSplit);
+	///产生静态阴影相机
+	void SetupDirLightStaticShadowCamera(Camera* shadowCamera, Light* light, float nearSplit, float farSplit);
     /// Finalize shadow camera view after shadow casters and the shadow map are known.
     void
         FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport, const BoundingBox& shadowCasterBox);
@@ -253,7 +262,8 @@ private:
         const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox);
     /// Return the viewport for a shadow map split.
     IntRect GetShadowMapViewport(Light* light, int splitIndex, Texture2D* shadowMap);
-    /// Find and set a new zone for a drawable when it has moved.
+	IntRect GetDirectionalLightStaticShadowMapViewport(Texture2D* shadowMap);
+	/// Find and set a new zone for a drawable when it has moved.
     void FindZone(Drawable* drawable);
     /// Return material technique, considering the drawable's LOD distance.
     Technique* GetTechnique(Drawable* drawable, Material* material);
@@ -392,6 +402,8 @@ private:
     PODVector<Zone*> zones_;
     /// Visible geometry objects.
     PODVector<Drawable*> geometries_;
+	/// 所有静态的阴影投射体几何，用于产生静态阴影
+	PODVector<Drawable*> allStaticCasters_;
     /// Geometry objects that will be updated in the main thread.
     PODVector<Drawable*> nonThreadedGeometries_;
     /// Geometry objects that will be updated in worker threads.
@@ -410,7 +422,7 @@ private:
     /// Intermediate light processing results.
     Vector<LightQueryResult> lightQueryResults_;
     /// Info for scene render passes defined by the renderpath.
-    PODVector<ScenePassInfo> scenePasses_;
+    Vector<ScenePassInfo> scenePasses_;
     /// Per-pixel light queues.
     Vector<LightBatchQueue> lightQueues_;
     /// Per-vertex light queues.
@@ -437,6 +449,10 @@ private:
     const RenderPathCommand* passCommand_{};
     /// Flag for scene being resolved from the backbuffer.
     bool usedResolve_{};
+	//是否启用静态阴影
+	bool enableStaticShadow_;
+	//是否更新静态阴影
+	bool updateStaticShadow_;
 };
 
 }

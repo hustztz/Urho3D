@@ -31,6 +31,9 @@ varying vec4 vWorldPos;
 #else
     varying vec3 vVertexLight;
 #endif
+#ifdef LOGDEPTH
+varying float positionW;
+#endif
 
 void VS()
 {
@@ -39,7 +42,11 @@ void VS()
     gl_Position = GetClipPos(worldPos);
     vTexCoord = GetTexCoord(iTexCoord);
     vWorldPos = vec4(worldPos, GetDepth(gl_Position));
-
+	
+#ifdef LOGDEPTH
+	positionW = gl_Position.w;
+#endif	
+	
     #ifdef SOFTPARTICLES
         vScreenPos = GetScreenPos(gl_Position);
     #endif
@@ -79,6 +86,10 @@ void VS()
 
 void PS()
 {
+#ifdef LOGDEPTH
+	if(!cCameraOrthoPS)
+		gl_FragDepth = log2(1. + positionW)/log2(1. + cFarClipPS);
+#endif
     // Get material diffuse albedo
     #ifdef DIFFMAP
         vec4 diffInput = texture2D(sDiffMap, vTexCoord);

@@ -100,6 +100,11 @@ vec4 GetShadowPos(int index, vec3 normal, vec4 projWorldPos)
     #endif
 }
 
+vec4 GetStaticShadowPos(vec4 projWorldPos)
+{
+    return projWorldPos * cStaticLightMatrix;
+}
+
 #endif
 #endif
 
@@ -242,6 +247,40 @@ float GetShadow(vec4 shadowPos)
         return cShadowIntensity.y + cShadowIntensity.x * Chebyshev(samples, shadowPos.z / shadowPos.w);
     #endif
 }
+float GetStaticShadow(vec4 shadowPos)
+{
+    #if defined(SIMPLE_SHADOW)
+        // Take one sample
+        #ifndef GL3
+            float inLight = shadow2DProj(sStaticShadowMap, shadowPos).r;
+        #else
+            float inLight = textureProj(sStaticShadowMap, shadowPos);
+        #endif
+        return cShadowIntensity.y + cShadowIntensity.x * inLight;
+    #elif defined(PCF_SHADOW)
+        // Take four samples and average them
+        // Note: in case of sampling a point light cube shadow, we optimize out the w divide as it has already been performed
+        #ifndef POINTLIGHT
+            vec2 offsets = cShadowMapInvSize * shadowPos.w;
+        #else
+            vec2 offsets = cShadowMapInvSize;
+        #endif
+        #ifndef GL3
+            return cShadowIntensity.y + cShadowIntensity.x * (shadow2DProj(sStaticShadowMap, shadowPos).r +
+                shadow2DProj(sStaticShadowMap, vec4(shadowPos.x + offsets.x, shadowPos.yzw)).r +
+                shadow2DProj(sStaticShadowMap, vec4(shadowPos.x, shadowPos.y + offsets.y, shadowPos.zw)).r +
+                shadow2DProj(sStaticShadowMap, vec4(shadowPos.xy + offsets.xy, shadowPos.zw)).r);
+        #else
+            return cShadowIntensity.y + cShadowIntensity.x * (textureProj(sStaticShadowMap, shadowPos) +
+                textureProj(sStaticShadowMap, vec4(shadowPos.x + offsets.x, shadowPos.yzw)) +
+                textureProj(sStaticShadowMap, vec4(shadowPos.x, shadowPos.y + offsets.y, shadowPos.zw)) +
+                textureProj(sStaticShadowMap, vec4(shadowPos.xy + offsets.xy, shadowPos.zw)));
+        #endif
+    #elif defined(VSM_SHADOW)
+        vec2 samples = texture2D(sStaticShadowMap, shadowPos.xy / shadowPos.w).rg; 
+        return cShadowIntensity.y + cShadowIntensity.x * Chebyshev(samples, shadowPos.z / shadowPos.w);
+    #endif
+}
 #else
 float GetShadow(highp vec4 shadowPos)
 {
@@ -260,6 +299,26 @@ float GetShadow(highp vec4 shadowPos)
         return cShadowIntensity.y + dot(inLight, vec4(cShadowIntensity.x));
     #elif defined(VSM_SHADOW)
         vec2 samples = texture2D(sShadowMap, shadowPos.xy / shadowPos.w).rg; 
+        return cShadowIntensity.y + cShadowIntensity.x * Chebyshev(samples, shadowPos.z / shadowPos.w);
+    #endif
+}
+float GetStaticShadow(highp vec4 shadowPos)
+{
+    #if defined(SIMPLE_SHADOW)
+        // Take one sample
+        return cShadowIntensity.y + (texture2DProj(sStaticShadowMap, shadowPos).r * shadowPos.w > shadowPos.z ? cShadowIntensity.x : 0.0);
+    #elif defined(PCF_SHADOW)
+        // Take four samples and average them
+        vec2 offsets = cShadowMapInvSize * shadowPos.w;
+        vec4 inLight = vec4(
+            texture2DProj(sStaticShadowMap, shadowPos).r * shadowPos.w > shadowPos.z,
+            texture2DProj(sStaticShadowMap, vec4(shadowPos.x + offsets.x, shadowPos.yzw)).r * shadowPos.w > shadowPos.z,
+            texture2DProj(sStaticShadowMap, vec4(shadowPos.x, shadowPos.y + offsets.y, shadowPos.zw)).r * shadowPos.w > shadowPos.z,
+            texture2DProj(sStaticShadowMap, vec4(shadowPos.xy + offsets.xy, shadowPos.zw)).r * shadowPos.w > shadowPos.z
+        );
+        return cShadowIntensity.y + dot(inLight, vec4(cShadowIntensity.x));
+    #elif defined(VSM_SHADOW)
+        vec2 samples = texture2D(sStaticShadowMap, shadowPos.xy / shadowPos.w).rg; 
         return cShadowIntensity.y + cShadowIntensity.x * Chebyshev(samples, shadowPos.z / shadowPos.w);
     #endif
 }
@@ -317,6 +376,67 @@ float GetDirShadow(const highp vec4 iShadowPos[NUMCASCADES], float depth)
 #endif
 
 #ifndef GL_ES
+float GetDirShadowAndStaticShadowDeferred(vec4 projWorldPos, vec3 normal, float depth)
+{
+    vec4 shadowPos;
+	int split = 0;
+
+    #ifdef NORMALOFFSET
+        float cosAngle = clamp(1.0 - dot(normal, cLightDirPS), 0.0, 1.0);
+        if (depth < cShadowSplits.x)
+		{
+            shadowPos = vec4(projWorldPos.xyz + cosAngle * cNormalOffsetScalePS.x * normal, 1.0) * cLightMatricesPS[0];
+			split = 0;
+		}
+        else if (depth < cShadowSplits.y)
+		{
+            shadowPos = vec4(projWorldPos.xyz + cosAngle * cNormalOffsetScalePS.y * normal, 1.0) * cLightMatricesPS[1];
+			split = 1;
+ 		}
+        else if (depth < cShadowSplits.z)
+		{
+            shadowPos = vec4(projWorldPos.xyz + cosAngle * cNormalOffsetScalePS.z * normal, 1.0) * cLightMatricesPS[2];
+			split = 2;
+		}
+        else
+		{
+            shadowPos = vec4(projWorldPos.xyz + cosAngle * cNormalOffsetScalePS.w * normal, 1.0) * cLightMatricesPS[3];
+			split = 3;
+		}
+    #else
+        if (depth < cShadowSplits.x)
+		{
+            shadowPos = projWorldPos * cLightMatricesPS[0];
+			split = 0;
+		}
+        else if (depth < cShadowSplits.y)
+		{
+            shadowPos = projWorldPos * cLightMatricesPS[1];
+			split = 1;
+		}
+        else if (depth < cShadowSplits.z)
+		{
+            shadowPos = projWorldPos * cLightMatricesPS[2];
+			split = 2;
+		}
+        else
+		{
+            shadowPos = projWorldPos * cLightMatricesPS[3];
+			split = 3;
+		}
+    #endif
+
+	if(split != cNumSplitsPS - 1)
+	    return GetDirShadowFade(GetShadow(shadowPos), depth);
+	else
+	{
+		if(cEnableStaticShadow)
+			return GetDirShadowFade(min(GetShadow(shadowPos), GetStaticShadow(projWorldPos * cStaticLightMatrixPS)),depth);
+		else
+			return GetDirShadowFade(GetShadow(shadowPos), depth);
+	}
+}
+
 float GetDirShadowDeferred(vec4 projWorldPos, vec3 normal, float depth)
 {
     vec4 shadowPos;
@@ -363,10 +483,102 @@ float GetShadow(const highp vec4 iShadowPos[NUMCASCADES], float depth)
 }
 
 #ifndef GL_ES
+float GetStaticShadow(const vec4 iShadowPos, float depth)
+#else
+float GetStaticShadow(const highp vec4 iShadowPos, float depth)
+#endif
+{
+    #if defined(DIRLIGHT)
+        return GetStaticShadow(iShadowPos);//GetDirShadowFade(GetStaticShadow(iShadowPos), depth);
+    #else
+        return 1.;
+    #endif
+}
+
+
+#if !defined(GL_ES) || defined(WEBGL)
+float GetDirShadowAndStaticShadow(const vec4 iShadowPos[NUMCASCADES], const vec4 iStaticShadowPos, float depth)
+{
+    vec4 shadowPos;
+	int split = 0;
+
+    if (depth < cShadowSplits.x)
+	{
+        shadowPos = iShadowPos[0];
+		split = 0;
+	}
+    else if (depth < cShadowSplits.y)
+ 	{
+       shadowPos = iShadowPos[1];
+	   split = 1;
+	}
+    else if (depth < cShadowSplits.z)
+	{
+       shadowPos = iShadowPos[2];
+	   split = 2;
+	}
+    else
+ 	{
+       shadowPos = iShadowPos[3];
+	   split = 3;
+ 	}
+	if(split != cNumSplitsPS - 1)
+	    return GetDirShadowFade(GetShadow(shadowPos), depth);
+	else
+	{
+		if(cEnableStaticShadow)
+			return GetDirShadowFade(min(GetShadow(shadowPos), GetStaticShadow(iStaticShadowPos)),depth);
+		else
+			return GetDirShadowFade(GetShadow(shadowPos), depth);
+	}
+}
+#else
+float GetDirShadowAndStaticShadow(const highp vec4 iShadowPos[NUMCASCADES], const vec4 iStaticShadowPos, float depth)
+{
+    return GetDirShadowFade(GetShadow(iShadowPos[0]), depth);
+}
+#endif
+
+#ifndef GL_ES
+float GetShadowAndStaticShadow(const vec4 iShadowPos[NUMCASCADES], const vec4 iStaticShadowPos, float depth)
+#else
+float GetShadowAndStaticShadow(const highp vec4 iShadowPos[NUMCASCADES], const highp vec4 iStaticShadowPos, float depth)
+#endif
+{
+    #if defined(DIRLIGHT)
+        return GetDirShadowAndStaticShadow(iShadowPos, iStaticShadowPos, depth);
+    #elif defined(SPOTLIGHT)
+        return GetShadow(iShadowPos[0]);
+    #else
+        return GetPointShadow(iShadowPos[0].xyz);
+    #endif
+}
+
+#ifndef GL_ES
 float GetShadowDeferred(vec4 projWorldPos, vec3 normal, float depth)
 {
     #ifdef DIRLIGHT
         return GetDirShadowDeferred(projWorldPos, normal, depth);
+    #else
+        #ifdef NORMALOFFSET
+            float cosAngle = clamp(1.0 - dot(normal, normalize(cLightPosPS.xyz - projWorldPos.xyz)), 0.0, 1.0);
+            projWorldPos.xyz += cosAngle * cNormalOffsetScalePS.x * normal;
+        #endif
+
+        #ifdef SPOTLIGHT
+            vec4 shadowPos = projWorldPos * cLightMatricesPS[1];
+            return GetShadow(shadowPos);
+        #else
+            vec3 shadowPos = projWorldPos.xyz - cLightPosPS.xyz;
+            return GetPointShadow(shadowPos);
+        #endif
+    #endif
+}
+
+float GetShadowAndStaticShadowDeferred(vec4 projWorldPos, vec3 normal, float depth)
+{
+    #ifdef DIRLIGHT
+        return GetDirShadowAndStaticShadowDeferred(projWorldPos, normal, depth);
     #else
         #ifdef NORMALOFFSET
             float cosAngle = clamp(1.0 - dot(normal, normalize(cLightPosPS.xyz - projWorldPos.xyz)), 0.0, 1.0);

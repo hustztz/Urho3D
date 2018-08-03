@@ -56,6 +56,8 @@ class Zone;
 struct RayQueryResult;
 struct WorkItem;
 class Pass;
+class MaterialShaderParameter;
+class Drawable;
 
 /// Geometry update type.
 enum UpdateGeometryType
@@ -63,6 +65,12 @@ enum UpdateGeometryType
     UPDATE_NONE = 0,
     UPDATE_MAIN_THREAD,
     UPDATE_WORKER_THREAD
+};
+
+enum DynamicType
+{
+	Dynamic,
+	Static
 };
 
 /// Rendering frame update parameters.
@@ -105,10 +113,35 @@ struct URHO3D_API SourceBatch
     void* instancingData_{};
     /// %Geometry type.
     GeometryType geometryType_{GEOM_STATIC};
+	
+	/*SharedPtr<Material> oldMaterial_;
+	SharedPtr<Technique> oldTechnique_;*/
+};
 
-	HashSet<String> addPassNames_;
-	SharedPtr<Material> oldMaterial_;
-	SharedPtr<Technique> oldTechnique_;
+/// drawable's override shader parameter animation instance
+class OverrideShaderParameterAnimationInfo : public ValueAnimationInfo
+{
+public:
+	/// Construct.
+	OverrideShaderParameterAnimationInfo
+		(Drawable* drawalbe, const String& name, ValueAnimation* attributeAnimation, WrapMode wrapMode, float speed);
+	/// Copy construct.
+	OverrideShaderParameterAnimationInfo(const OverrideShaderParameterAnimationInfo& other);
+	/// Destruct.
+	~OverrideShaderParameterAnimationInfo() override;
+
+	/// Return shader parameter name.
+	const String& GetName() const {
+		return name_;
+	}
+
+protected:
+	/// Apply new animation value to the target object. Called by Update().
+	void ApplyValue(const Variant& newValue) override;
+
+private:
+	/// Shader parameter name.
+	String name_;
 };
 
 /// Base class for visible components.
@@ -161,12 +194,17 @@ public:
     void SetLodBias(float bias);
     /// Set view mask. Is and'ed with camera's view mask to see if the object should be rendered.
     void SetViewMask(unsigned mask);
+	/// Set override mask
+	void SetOverrideViewMask(unsigned mask);
+	/// 取消 override view mask，即置所有bit为1
+	void CancelOverrideViewMask();
     /// Set light mask. Is and'ed with light's and zone's light mask to see if the object should be lit.
     void SetLightMask(unsigned mask);
     /// Set shadow mask. Is and'ed with light's light mask and zone's shadow mask to see if the object should be rendered to a shadow map.
     void SetShadowMask(unsigned mask);
     /// Set zone mask. Is and'ed with zone's zone mask to see if the object should belong to the zone.
     void SetZoneMask(unsigned mask);
+	void SetDynamicType(DynamicType type);
     /// Set maximum number of per-pixel lights. Default 0 is unlimited.
     void SetMaxLights(unsigned num);
     /// Set shadowcaster flag.
@@ -197,7 +235,7 @@ public:
     float GetLodBias() const { return lodBias_; }
 
     /// Return view mask.
-    unsigned GetViewMask() const { return viewMask_; }
+    unsigned GetViewMask() const { return viewMask_&overrideViewMask_; }
 
     /// Return light mask.
     unsigned GetLightMask() const { return lightMask_; }
@@ -207,6 +245,9 @@ public:
 
     /// Return zone mask.
     unsigned GetZoneMask() const { return zoneMask_; }
+
+	/// Return dynamic type.
+	DynamicType GetDynamicType() const { return dynamicType_; }
 
     /// Return maximum number of per-pixel lights.
     unsigned GetMaxLights() const { return maxLights_; }
@@ -310,10 +351,33 @@ public:
     }
 
 	Pass* AddPass(const String& passName, const String& vsName, const String& psName, const String& vsDefines = "", const String& psDefines = "");
-	Pass* AddPass(unsigned int index, const String& passName, const String& vsName, const String& psName, const String& vsDefines = "", const String& psDefines = "");
+	//Pass* AddPass(unsigned int index, const String& passName, const String& vsName, const String& psName, const String& vsDefines = "", const String& psDefines = "");
 	bool RemovePass(const String& passName);
-	bool RemovePass(unsigned int index, const String& passName);
+	//bool RemovePass(unsigned int index, const String& passName);
+	Pass* GetPass(String passName);
 
+	/// Set override shader parameter.
+	void SetOverrideShaderParameter(const String& name, const Variant& value);
+	/// Remove override shader parameter.
+	bool RemoveOverrideShaderParameter(const String& name);
+	/// 返回override shader parameters
+	HashMap<StringHash, MaterialShaderParameter>& GetOverrideShaderParameters() { return overrideShaderParameters_; }
+	/// 设置override technique
+	void SetOverrideTechnique(Technique* overrideTechnique){ overrideTechnique_ = overrideTechnique; }
+	/// 返回override technique
+	Technique* GetOverrideTechnique() { return overrideTechnique_; }
+	///取消override technique
+	void CancelOverrideTechnique() { overrideTechnique_ = nullptr; }
+	/// 设置override render state（fillmode）
+	void SetOverrideFillMode(FillMode fillMode) { overrideFillMode_ = fillMode; }
+	/// 返回override render state（fillmode）
+	FillMode GetOverrideFillMode() { return overrideFillMode_; }
+	/// Set Override shader parameter animation.
+	void SetOverrideShaderParameterAnimation(const String& name, ValueAnimation* animation, WrapMode wrapMode = WM_LOOP, float speed = 1.0f);
+	OverrideShaderParameterAnimationInfo* GetOverrideShaderParameterAnimationInfo(const String& name) const;
+private:
+	void UpdateEventSubscription();
+	void HandleAttributeAnimationUpdate(StringHash eventType, VariantMap& eventData);
 protected:
     /// Handle node being assigned.
     void OnNodeSet(Node* node) override;
@@ -361,6 +425,8 @@ protected:
     Zone* zone_;
     /// View mask.
     unsigned viewMask_;
+	/// Override View Mask, 主要用于和viewMask做并，来产生相应的可见性效果，去掉后（即置override view mask全bit为1），可以返回到viewMask的可见性效果
+	unsigned overrideViewMask_;
     /// Light mask.
     unsigned lightMask_;
     /// Shadow mask.
@@ -397,6 +463,19 @@ protected:
     PODVector<Light*> lights_;
     /// Per-vertex lights affecting this drawable.
     PODVector<Light*> vertexLights_;
+	///模型是否有运动，用于区分是否可以用于静态阴影
+	DynamicType dynamicType_;
+	///为了实现特效，一些drawable需要做一些额外的渲染，这些单独的pass就是做这个的。
+	HashMap<String, SharedPtr<Pass> > separatePasses_;
+	///为了lod材质切换时，材质lod切换，shader参数的变化能保留下来，在drawable级别存下这些shader参数
+	HashMap<StringHash, MaterialShaderParameter> overrideShaderParameters_;
+	///有的特效需要切换技术来实现，所以增加overrideTechnique属性，该属性会覆盖材质的技术
+	SharedPtr<Technique> overrideTechnique_;
+	///override render state
+	FillMode overrideFillMode_;
+private:
+	bool subscribed_{};
+	HashMap<StringHash, SharedPtr<OverrideShaderParameterAnimationInfo> > overrideShaderParameterAnimationInfos_;
 };
 
 inline bool CompareDrawables(Drawable* lhs, Drawable* rhs)

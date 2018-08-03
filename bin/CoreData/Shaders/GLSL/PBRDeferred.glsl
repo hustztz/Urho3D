@@ -55,6 +55,8 @@ void PS()
         #endif
         vec4 albedoInput = texture2D(sAlbedoBuffer, vScreenPos);
         vec4 normalInput = texture2D(sNormalBuffer, vScreenPos);
+		if(isnan(normalInput.x)||isnan(normalInput.y)||isnan(normalInput.z))
+			discard;
         vec4 specularInput = texture2D(sSpecMap, vScreenPos);
     #else
         vec4 depthInput = texture2DProj(sDepthBuffer, vScreenPos);
@@ -70,6 +72,8 @@ void PS()
         #endif
         vec4 albedoInput = texture2DProj(sAlbedoBuffer, vScreenPos);
         vec4 normalInput = texture2DProj(sNormalBuffer, vScreenPos);
+		if(isnan(normalInput.x)||isnan(normalInput.y)||isnan(normalInput.z))
+			discard;
         vec4 specularInput = texture2DProj(sSpecMap, vScreenPos);
     #endif
 
@@ -78,7 +82,7 @@ void PS()
     worldPos += cCameraPosPS;
 
     vec3 normal = normalInput.rgb;
-    float roughness = length(normal);
+    float roughness = clamp(length(normal), M_EPSILON, 1.0);
     normal = normalize(normal);
 
     vec3 specColor = specularInput.rgb;
@@ -99,7 +103,7 @@ void PS()
 
     float shadow = 1;
     #ifdef SHADOW
-        shadow *= GetShadowDeferred(projWorldPos, normal, depth);
+        shadow *= GetShadowAndStaticShadowDeferred(projWorldPos, normal, depth);
     #endif
 
     #if defined(SPOTLIGHT)
@@ -120,6 +124,6 @@ void PS()
     vec3 BRDF = GetBRDF(worldPos, lightDir, lightVec, toCamera, normal, roughness, albedoInput.rgb, specColor);
 
     gl_FragColor.a = 1.0;
-    gl_FragColor.rgb = BRDF * lightColor * (atten * shadow) / M_PI;
+    gl_FragColor.rgb = vec3(specularInput.a, albedoInput.a, normalInput.a) + clamp(BRDF * lightColor * (atten * shadow), 0., 10000.);
 
 }

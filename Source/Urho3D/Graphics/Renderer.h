@@ -396,6 +396,8 @@ public:
     Geometry* GetQuadGeometry();
     /// Allocate a shadow map. If shadow map reuse is disabled, a different map is returned each time.
     Texture2D* GetShadowMap(Light* light, Camera* camera, unsigned viewWidth, unsigned viewHeight);
+	/// Allocate a static shadow map. 和view绑定, 只有方向光才有
+	Texture2D* GetDirectionalLightStaticShadowMap(Light* light, Camera* camera, View* view);
     /// Allocate a rendertarget or depth-stencil texture for deferred rendering or postprocessing. Should only be called during actual rendering, not before.
     Texture* GetScreenBuffer
         (int width, int height, unsigned format, int multiSample, bool autoResolve, bool cubemap, bool filtered, bool srgb, unsigned persistentKey = 0);
@@ -428,6 +430,12 @@ public:
     /// Return a view or its source view if it uses one. Used internally for render statistics.
     static View* GetActualView(View* view);
 
+	void SetOverrideShaderParametersSet(bool enable) { overrideShaderParametersSet = enable; }
+	bool GetOverrideShaderParametersSet() { return overrideShaderParametersSet;}
+	/// 启用对数深度
+	void EnableLogDepth(bool enable){ usingLogDepth_ = enable; }
+	/// 是否启用对数深度
+	bool IsUsingLogDepth() const { return usingLogDepth_; }
 private:
     /// Initialize when screen mode initially set.
     void Initialize();
@@ -500,6 +508,8 @@ private:
     Vector<SharedPtr<OcclusionBuffer> > occlusionBuffers_;
     /// Shadow maps by resolution.
     HashMap<int, Vector<SharedPtr<Texture2D> > > shadowMaps_;
+	/// 静态阴影
+	HashMap<unsigned long long, Vector<SharedPtr<Texture2D> > > staticShadowMaps_;
     /// Shadow map dummy color buffers by resolution.
     HashMap<int, SharedPtr<Texture2D> > colorShadowMaps_;
     /// Shadow map allocations by resolution.
@@ -600,6 +610,10 @@ private:
     bool initialized_{};
     /// Flag for views needing reset.
     bool resetViews_{};
+	///有batch设置了override参数
+	bool overrideShaderParametersSet;
+	///是否使用对数深度
+	bool usingLogDepth_;
 };
 
 }

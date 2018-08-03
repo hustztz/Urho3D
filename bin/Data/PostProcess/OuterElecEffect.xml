@@ -1,0 +1,9 @@
+<renderpath>
+	<command type="scenepass" pass="OuterElecEffect" output="viewport" depthstencil="depth"	>
+		<parameter name="Extend" value="0.01" />
+		<parameter name="Speed" value="1.0" />
+		<parameter name="Sample" value="2.0" />
+		<parameter name="XDirection" value="0" />
+		<parameter name="Color" value="0 0 1 1" />
+	</command>		
+</renderpath>

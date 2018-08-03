@@ -7,6 +7,7 @@
 #include "Fog.glsl"
 #include "PBR.glsl"
 #include "IBL.glsl"
+#include "MathUtil.glsl"
 #line 30010
 
 #if defined(NORMALMAP)
@@ -17,6 +18,11 @@
 #endif
 varying vec3 vNormal;
 varying vec4 vWorldPos;
+varying float snowFactor;
+#ifdef LOGDEPTH
+varying float positionW;
+#endif
+//varying float fade;
 #ifdef VERTEXCOLOR
     varying vec4 vColor;
 #endif
@@ -24,9 +30,12 @@ varying vec4 vWorldPos;
     #ifdef SHADOW
         #ifndef GL_ES
             varying vec4 vShadowPos[NUMCASCADES];
+			varying vec4 vStaticShadowPos;
         #else
             varying highp vec4 vShadowPos[NUMCASCADES];
+			varying highp vec4 vStaticShadowPos;
         #endif
+
     #endif
     #ifdef SPOTLIGHT
         varying vec4 vSpotPos;
@@ -45,14 +54,35 @@ varying vec4 vWorldPos;
     #endif
 #endif
 
+#ifdef COMPILEVS
+float PixelScale = tan(0.5 * 3.14 /4.)*cGBufferInvSize.y *cNearClip;
+float Radius = -1.5;
+#endif
+
 void VS()
 {
     mat4 modelMatrix = iModelMatrix;
     vec3 worldPos = GetWorldPos(modelMatrix);
-    gl_Position = GetClipPos(worldPos);
-    vNormal = GetWorldNormal(modelMatrix);
-    vWorldPos = vec4(worldPos, GetDepth(gl_Position));
+    //gl_Position = GetClipPos(worldPos);
 
+	//float w = gl_Position.w;
+	
+//	float pixel_radius = -w * PixelScale;
+//	float radius = max( Radius, pixel_radius);
+//	fade = Radius / radius;
+	
+	vNormal = GetWorldNormal(modelMatrix);
+	if(cHasSnow||cHasRain)
+	{
+		float rim = 1.-clamp(dot(vec3(0.,1.,0.), vNormal), 0., 1.);
+		snowFactor = pow(0.05, rim*30.);
+	}
+//	worldPos = worldPos + radius*vNormal;
+	gl_Position = GetClipPos(worldPos);
+    vWorldPos = vec4(worldPos, GetDepth(gl_Position));
+#ifdef LOGDEPTH
+	positionW = gl_Position.w;
+#endif
     #ifdef VERTEXCOLOR
         vColor = iColor;
     #endif
@@ -69,11 +99,11 @@ void VS()
     #ifdef PERPIXEL
         // Per-pixel forward lighting
         vec4 projWorldPos = vec4(worldPos, 1.0);
-
         #ifdef SHADOW
             // Shadow projection: transform from world space to shadow space
             for (int i = 0; i < NUMCASCADES; i++)
                 vShadowPos[i] = GetShadowPos(i, vNormal, projWorldPos);
+			vStaticShadowPos = GetStaticShadowPos(projWorldPos);
         #endif
 
         #ifdef SPOTLIGHT
@@ -110,7 +140,11 @@ void VS()
 
 void PS()
 {
-    // Get material diffuse albedo
+#ifdef LOGDEPTH
+	if(!cCameraOrthoPS)
+		gl_FragDepth = log2(1. + positionW)/log2(1. + cFarClipPS);
+#endif
+    // Get material diffuse albed
     #ifdef DIFFMAP
         vec4 diffInput = texture2D(sDiffMap, vTexCoord.xy);
         #ifdef ALPHAMASK
@@ -141,8 +175,25 @@ void PS()
     roughness = clamp(roughness, ROUGHNESS_FLOOR, 1.0);
     metalness = clamp(metalness, METALNESS_FLOOR, 1.0);
 
+	if(cHasRain)
+	{
+		roughness = mix(roughness, 0.1, snowFactor);
+	}
     vec3 specColor = mix(0.08 * cMatSpecColor.rgb, diffColor.rgb, metalness);
+
     diffColor.rgb = diffColor.rgb - diffColor.rgb * metalness;
+	if(cHasRain)
+	{
+		specColor = mix(specColor, vec3(0.02), snowFactor);
+		diffColor *= clamp(1.6 - snowFactor, 0., 1.);
+	}
+	
+	if(cHasSnow)
+	{
+		roughness = mix(roughness, 1., snowFactor);
+		diffColor.rgb = mix(diffColor.rgb, vec3(1.), snowFactor);
+	//	specColor.rgb = mix(specColor.rgb, vec3(1.), snowFactor);
+	}
 
     // Get normal
     #if defined(NORMALMAP) || defined(DIRBILLBOARD)
@@ -158,6 +209,18 @@ void PS()
     #else
         vec3 normal = normalize(vNormal);
     #endif
+	
+	if(cHasRain)
+	{
+		float noiseX = simplex_noise(vWorldPos.xz * 5. + vec2(cElapsedTimePS * 1000., cElapsedTimePS * 2000.)) * 2. - 1.;
+		float noiseY = simplex_noise(vWorldPos.zx * 5. + vec2(cElapsedTimePS * 3000., cElapsedTimePS * 100.)) * 2. - 1.;
+		normal.x += noiseX/50.;
+		normal.z += noiseY/50.;
+		normal = normalize(normal);
+	}
+	
+	if(isnan(normal.x)||isnan(normal.y)||isnan(normal.z))
+		discard;
 
     // Get fog factor
     #ifdef HEIGHTFOG
@@ -184,7 +247,13 @@ void PS()
 
         float shadow = 1.0;
         #ifdef SHADOW
-            shadow = GetShadow(vShadowPos, vWorldPos.w);
+            //shadow = GetShadow(vShadowPos, vWorldPos.w);
+			shadow = GetShadowAndStaticShadow(vShadowPos, vStaticShadowPos, vWorldPos.w);
+			//if(gl_FragCoord.x*cGBufferInvSize.x < 0.2 && gl_FragCoord.y*cGBufferInvSize.y < 0.2)
+			//{
+			//	gl_FragColor = vec4(textureProj(sStaticShadowMap, vec4(gl_FragCoord.xy*cGBufferInvSize.xy*5., 1., 1.)));
+			//	return;
+			//}
         #endif
 
         #if defined(SPOTLIGHT)
@@ -198,12 +267,25 @@ void PS()
         vec3 lightVec = normalize(lightDir);
         float ndl = clamp((dot(normal, lightVec)), M_EPSILON, 1.0);
 
+	//	vec3 ddxN = dFdx(normal);
+	//	vec3 ddyN = dFdy(normal);
+	//	float curv2 = max(dot(ddxN, ddxN), dot(ddyN, ddyN));
+	//	curv2 = clamp(curv2, 0., 1.);
+		//roughness = max(roughness, curv2);
+		
         vec3 BRDF = GetBRDF(vWorldPos.xyz, lightDir, lightVec, toCamera, normal, roughness, diffColor.rgb, specColor);
 
-        finalColor.rgb = BRDF * lightColor * (atten * shadow) / M_PI;
+        finalColor.rgb = BRDF * lightColor * (atten * shadow) ;//* (0.4 - curv2);
 
         #ifdef AMBIENT
             finalColor += cAmbientColor.rgb * diffColor.rgb;
+			//#ifdef IBL
+				vec3 reflection = normalize(reflect(-toCamera, normal));
+				vec3 cubeColor = cAmbientColor.rgb;
+				vec3 iblColor = ImageBasedLighting(reflection, normal, toCamera, diffColor.rgb, specColor.rgb, roughness, cubeColor);
+				float gamma = 0.0;
+				finalColor.rgb += iblColor;
+			//#endif
             finalColor += cMatEmissiveColor;
             gl_FragColor = vec4(GetFog(finalColor, fogFactor), diffColor.a);
         #else
@@ -211,7 +293,46 @@ void PS()
         #endif
     #elif defined(DEFERRED)
         // Fill deferred G-buffer
-        const vec3 spareData = vec3(0,0,0); // Can be used to pass more data to deferred renderer
+		vec3 finalColor = vVertexLight * diffColor.rgb;
+        #ifdef AO
+            // If using AO, the vertex light ambient is black, calculate occluded ambient here
+            finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * cAmbientColor.rgb * diffColor.rgb;
+        #endif
+
+        #ifdef MATERIAL
+            // Add light pre-pass accumulation result
+            // Lights are accumulated at half intensity. Bring back to full intensity now
+            vec4 lightInput = 2.0 * texture2DProj(sLightBuffer, vScreenPos);
+            vec3 lightSpecColor = lightInput.a * lightInput.rgb / max(GetIntensity(lightInput.rgb), 0.001);
+
+            finalColor += lightInput.rgb * diffColor.rgb + lightSpecColor * specColor;
+        #endif
+
+        vec3 toCamera = normalize(vWorldPos.xyz - cCameraPosPS);
+        vec3 reflection = normalize(reflect(toCamera, normal));
+
+        vec3 cubeColor = vVertexLight.rgb;
+
+        #ifdef IBL
+          vec3 iblColor = ImageBasedLighting(reflection, normal, toCamera, diffColor.rgb, specColor.rgb, roughness, cubeColor);
+          float gamma = 0.0;
+          finalColor.rgb += iblColor;
+        #endif
+
+        #ifdef ENVCUBEMAP
+            finalColor += cMatEnvMapColor * textureCube(sEnvCubeMap, reflect(vReflectionVec, normal)).rgb;
+        #endif
+        #ifdef LIGHTMAP
+            finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * diffColor.rgb;
+        #endif
+        #ifdef EMISSIVEMAP
+            finalColor += cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord.xy).rgb;
+        #else
+            finalColor += cMatEmissiveColor;
+        #endif
+
+        finalColor = GetFog(finalColor, fogFactor);
+        vec3 spareData = vec3(finalColor); // Can be used to pass more data to deferred renderer
         gl_FragData[0] = vec4(specColor, spareData.r);
         gl_FragData[1] = vec4(diffColor.rgb, spareData.g);
         gl_FragData[2] = vec4(normal * roughness, spareData.b);

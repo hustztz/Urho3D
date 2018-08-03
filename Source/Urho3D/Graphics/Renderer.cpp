@@ -267,7 +267,9 @@ inline PODVector<VertexElement> CreateInstancingBufferElements(unsigned numExtra
 
 Renderer::Renderer(Context* context) :
     Object(context),
-    defaultZone_(new Zone(context))
+    defaultZone_(new Zone(context)),
+	overrideShaderParametersSet(false),
+	usingLogDepth_(false)
 {
     SubscribeToEvent(E_SCREENMODE, URHO3D_HANDLER(Renderer, HandleScreenMode));
 
@@ -993,6 +995,103 @@ Texture2D* Renderer::GetShadowMap(Light* light, Camera* camera, unsigned viewWid
     return newShadowMap;
 }
 
+Texture2D* Renderer::GetDirectionalLightStaticShadowMap(Light* light, Camera* camera, View* view)
+{
+	LightType type = light->GetLightType();
+	const FocusParameters& parameters = light->GetShadowFocus();
+	float size = (float)shadowMapSize_ * light->GetShadowResolution() * 2;//静态阴影因为要覆盖整个场景，所以分辨率设为动态阴影的2倍。
+	/// \todo Allow to specify maximum shadow maps per resolution, as smaller shadow maps take less memory
+	int width = NextPowerOfTwo((unsigned)size);
+	int height = width;
+
+	unsigned long long searchKey = width << 16u | height;
+	searchKey << 32u;
+	searchKey |= *reinterpret_cast<unsigned*>(view);
+	if (staticShadowMaps_.Contains(searchKey))
+	{
+		return staticShadowMaps_[searchKey][0];
+	}
+
+	// Find format and usage of the shadow map
+	unsigned shadowMapFormat = 0;
+	TextureUsage shadowMapUsage = TEXTURE_DEPTHSTENCIL;
+	int multiSample = 1;
+
+	switch (shadowQuality_)
+	{
+		case SHADOWQUALITY_SIMPLE_16BIT:
+		case SHADOWQUALITY_PCF_16BIT:
+			shadowMapFormat = graphics_->GetShadowMapFormat();
+			break;
+
+		case SHADOWQUALITY_SIMPLE_24BIT:
+		case SHADOWQUALITY_PCF_24BIT:
+			shadowMapFormat = graphics_->GetHiresShadowMapFormat();
+			break;
+
+		case SHADOWQUALITY_VSM:
+		case SHADOWQUALITY_BLUR_VSM:
+			shadowMapFormat = graphics_->GetRGFloat32Format();
+			shadowMapUsage = TEXTURE_RENDERTARGET;
+			multiSample = vsmMultiSample_;
+			break;
+	}
+
+	if (!shadowMapFormat)
+		return nullptr;
+
+	SharedPtr<Texture2D> newShadowMap(new Texture2D(context_));
+	int retries = 3;
+	unsigned dummyColorFormat = graphics_->GetDummyColorFormat();
+
+	// Disable mipmaps from the shadow map
+	newShadowMap->SetNumLevels(1);
+
+	while (retries)
+	{
+		if (!newShadowMap->SetSize(width, height, shadowMapFormat, shadowMapUsage, multiSample))
+		{
+			width >>= 1;
+			height >>= 1;
+			--retries;
+		} else
+		{
+#ifndef GL_ES_VERSION_2_0
+			// OpenGL (desktop) and D3D11: shadow compare mode needs to be specifically enabled for the shadow map
+			newShadowMap->SetFilterMode(FILTER_BILINEAR);
+			newShadowMap->SetShadowCompare(shadowMapUsage == TEXTURE_DEPTHSTENCIL);
+#endif
+#ifndef URHO3D_OPENGL
+			// Direct3D9: when shadow compare must be done manually, use nearest filtering so that the filtering of point lights
+			// and other shadowed lights matches
+			newShadowMap->SetFilterMode(graphics_->GetHardwareShadowSupport() ? FILTER_BILINEAR : FILTER_NEAREST);
+#endif
+			// Create dummy color texture for the shadow map if necessary: Direct3D9, or OpenGL when working around an OS X +
+			// Intel driver bug
+			if (shadowMapUsage == TEXTURE_DEPTHSTENCIL && dummyColorFormat)
+			{
+				// If no dummy color rendertarget for this size exists yet, create one now
+				if (!colorShadowMaps_.Contains(searchKey))
+				{
+					colorShadowMaps_[searchKey] = new Texture2D(context_);
+					colorShadowMaps_[searchKey]->SetNumLevels(1);
+					colorShadowMaps_[searchKey]->SetSize(width, height, dummyColorFormat, TEXTURE_RENDERTARGET);
+				}
+				// Link the color rendertarget to the shadow map
+				newShadowMap->GetRenderSurface()->SetLinkedRenderTarget(colorShadowMaps_[searchKey]->GetRenderSurface());
+			}
+			break;
+		}
+	}
+
+	// If failed to set size, store a null pointer so that we will not retry
+	if (!retries)
+		newShadowMap.Reset();
+
+	staticShadowMaps_[searchKey].Push(newShadowMap);
+	return newShadowMap;
+}
+
 Texture* Renderer::GetScreenBuffer(int width, int height, unsigned format, int multiSample, bool autoResolve, bool cubemap, bool filtered, bool srgb,
     unsigned persistentKey)
 {
@@ -1318,13 +1417,21 @@ void Renderer::SetLightVolumeBatchShaders(Batch& batch, Camera* camera, const St
         psi += DLPS_ORTHO;
     }
 
+	String vsDefinesTemp = vsDefines;
+	String psDefinesTemp = psDefines;
+	if (IsUsingLogDepth())
+	{
+		vsDefinesTemp += " LOGDEPTH";
+		psDefinesTemp += " LOGDEPTH";
+	}
+
     if (vsDefines.Length())
-        batch.vertexShader_ = graphics_->GetShader(VS, vsName, deferredLightVSVariations[vsi] + vsDefines);
+        batch.vertexShader_ = graphics_->GetShader(VS, vsName, deferredLightVSVariations[vsi] + vsDefinesTemp);
     else
         batch.vertexShader_ = graphics_->GetShader(VS, vsName, deferredLightVSVariations[vsi]);
 
     if (psDefines.Length())
-        batch.pixelShader_ = graphics_->GetShader(PS, psName, deferredLightPSVariations_[psi] + psDefines);
+        batch.pixelShader_ = graphics_->GetShader(PS, psName, deferredLightPSVariations_[psi] + psDefinesTemp);
     else
         batch.pixelShader_ = graphics_->GetShader(PS, psName, deferredLightPSVariations_[psi]);
 }
@@ -1482,8 +1589,11 @@ void Renderer::UpdateQueuedViewport(unsigned index)
         return;
 
     // (Re)allocate the view structure if necessary
-    if (!viewport->GetView() || resetViews_)
-        viewport->AllocateView();
+	if (!viewport->GetView() || resetViews_)
+	{
+		viewport->AllocateView();
+		viewport->EnableStaticShadow(viewport->GetEnableStaticShadow());
+	}
 
     View* view = viewport->GetView();
     assert(view);
@@ -1597,7 +1707,8 @@ void Renderer::Initialize()
     defaultMaterial_ = new Material(context_);
 
     defaultRenderPath_ = new RenderPath();
-    defaultRenderPath_->Load(cache->GetResource<XMLFile>("RenderPaths/Forward.xml"));
+    defaultRenderPath_->Load(cache->GetResource<XMLFile>("RenderPaths/ForwardHWDepth.xml"));
+//	defaultRenderPath_->Load(cache->GetResource<XMLFile>("RenderPaths/PBRDeferredHWDepth.xml"));
 
     CreateGeometries();
     CreateInstancingBuffer();
@@ -1672,6 +1783,11 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
         vsDefines += "VSM_SHADOW ";
         psDefines += "VSM_SHADOW ";
     }
+	if (IsUsingLogDepth())
+	{
+		vsDefines += "LOGDEPTH ";
+		psDefines += "LOGDEPTH ";
+	}
 
     if (pass->GetLightingMode() == LIGHTING_PERPIXEL)
     {
@@ -1900,6 +2016,7 @@ void Renderer::ResetShadowMaps()
     shadowMaps_.Clear();
     shadowMapAllocations_.Clear();
     colorShadowMaps_.Clear();
+	staticShadowMaps_.Clear();
 }
 
 void Renderer::ResetBuffers()

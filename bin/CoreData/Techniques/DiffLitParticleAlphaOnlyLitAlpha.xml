@@ -1,0 +1,4 @@
+<technique vs="LitParticle" ps="LitParticle" psdefines="DIFFMAP" >
+	<pass name="litalpha" depthwrite="false" blend="alpha" cull="none" />
+    <pass name="shadow" vs="Shadow" ps="Shadow" />
+</technique>

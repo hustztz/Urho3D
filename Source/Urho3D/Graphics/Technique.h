@@ -57,6 +57,8 @@ public:
     void SetLightingMode(PassLightingMode mode);
     /// Set depth write on/off.
     void SetDepthWrite(bool enable);
+	/// Set Depth Bias.
+	void SetDepthBias(float constantBias, float slopeScaledBias);
 	/// Set line antialiasing on/off. Has effect only on models that consist of line lists.
 	void SetEnablePointSize(bool enable);
     /// Set alpha-to-coverage on/off.
@@ -104,6 +106,11 @@ public:
     /// Return depth write mode.
     bool GetDepthWrite() const { return depthWrite_; }
 
+	/// Return Polygen Constant Offset
+	float GetDepthBiasConstantBias() const { return constantBias_; }
+	/// Polygen Scale Factor
+	float GetDepthBiasSlopeScaledBias() const { return slopeScaledBias_; }
+
 	/// Return whether line antialiasing is enabled.
 	bool EnablePointSize() const { return enablePointSize_; }
 
@@ -145,6 +152,9 @@ public:
     String GetEffectiveVertexShaderDefines() const;
     /// Return the effective pixel shader defines, accounting for excludes. Called internally by Renderer.
     String GetEffectivePixelShaderDefines() const;
+
+	///把传人pass的所有状态都复制到本pass，除了名字
+	void CopyAllState(const Pass* pass);
 
 private:
     /// Pass index.
@@ -189,6 +199,10 @@ private:
     HashMap<StringHash, Vector<SharedPtr<ShaderVariation> > > extraPixelShaders_;
     /// Pass name.
     String name_;
+	/// Polygen Constant Offset
+	float constantBias_;
+	/// Polygen Scale Factor 
+	float slopeScaledBias_;
 };
 
 /// %Material technique. Consists of several passes.
@@ -260,6 +274,9 @@ public:
 
     /// Return a pass type index by name. Allocate new if not used yet.
     static unsigned GetPassIndex(const String& passName);
+
+	/// 移除所有pass
+	void RemoveAllPasses();
 
     /// Index for base pass. Initialized once GetPassIndex() has been called for the first time.
     static unsigned basePassIndex;

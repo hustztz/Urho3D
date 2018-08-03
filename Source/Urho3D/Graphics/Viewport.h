@@ -99,7 +99,11 @@ public:
 
 	void AddFilter(Filter* filter);
 
-	template<class T> T* GetFilter();
+	template<class T> T* GetFilter() const;
+
+	void EnableStaticShadow(bool enableStaticShadow);
+	bool GetEnableStaticShadow() { return enableStaticShadow_; }
+	void UpdateStaticShadow();
 
 private:
     /// Scene pointer.
@@ -116,8 +120,27 @@ private:
     SharedPtr<View> view_;
     /// Debug draw flag.
     bool drawDebug_;
-
+	///添加的filters
 	HashMap<String, SharedPtr<Filter> > filters_;
+	//是否启用静态阴影
+	bool enableStaticShadow_;
 };
+
+
+template<class T> T* Viewport::GetFilter() const
+{
+	if(!T::GetTypeInfoStatic()->IsTypeOf(Filter::GetTypeStatic()))
+	{
+		return nullptr;
+	}
+	HashMap<String, SharedPtr<Filter> >::ConstIterator iter = filters_.Find(T::GetTypeNameStatic());
+	if (iter == filters_.End())
+	{
+		return nullptr;
+	} else
+	{
+		return dynamic_cast<T*>(iter->second_.Get());
+	}
+}
 
 }

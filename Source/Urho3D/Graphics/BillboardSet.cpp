@@ -54,6 +54,7 @@ const char* faceCameraModeNames[] =
     "LookAt Y",
     "LookAt Mixed",
     "Direction",
+	"All Billboardes Rotate Y",
     nullptr
 };
 
@@ -218,8 +219,14 @@ void BillboardSet::UpdateBatches(const FrameInfo& frame)
     // Billboard positioning
     transforms_[0] = relative_ ? node_->GetWorldTransform() : Matrix3x4::IDENTITY;
     // Billboard rotation
-    transforms_[1] = Matrix3x4(Vector3::ZERO, faceCameraMode_ != FC_NONE ? frame.camera_->GetFaceCameraRotation(
-        node_->GetWorldPosition(), node_->GetWorldRotation(), faceCameraMode_, minAngle_) : node_->GetWorldRotation(), Vector3::ONE);
+	if (faceCameraMode_ == FC_ALL_BILLBOARDES_ROTATE_Y)
+		transforms_[1] = Matrix3x4(0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.);
+	else
+	{
+		transforms_[1] = Matrix3x4(Vector3::ZERO, faceCameraMode_ != FC_NONE ? frame.camera_->GetFaceCameraRotation(
+			node_->GetWorldPosition(), node_->GetWorldRotation(), faceCameraMode_, minAngle_) : node_->GetWorldRotation(), Vector3::ONE);
+	}
+    
 }
 
 void BillboardSet::UpdateGeometry(const FrameInfo& frame)
@@ -231,8 +238,11 @@ void BillboardSet::UpdateGeometry(const FrameInfo& frame)
     // If using camera facing, re-update the rotation for the current view now
     if (faceCameraMode_ != FC_NONE)
     {
-        transforms_[1] = Matrix3x4(Vector3::ZERO, frame.camera_->GetFaceCameraRotation(node_->GetWorldPosition(),
-            node_->GetWorldRotation(), faceCameraMode_, minAngle_), Vector3::ONE);
+		if (faceCameraMode_ == FC_ALL_BILLBOARDES_ROTATE_Y)
+			transforms_[1] = Matrix3x4(0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.);
+		else
+			transforms_[1] = Matrix3x4(Vector3::ZERO, frame.camera_->GetFaceCameraRotation(node_->GetWorldPosition(),
+				node_->GetWorldRotation(), faceCameraMode_, minAngle_), Vector3::ONE);
     }
 
     if (bufferSizeDirty_ || indexBuffer_->IsDataLost())

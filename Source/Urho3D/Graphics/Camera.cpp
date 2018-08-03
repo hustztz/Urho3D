@@ -73,7 +73,9 @@ Camera::Camera(Context* context) :
     flipVertical_(false),
     useReflection_(false),
     useClipping_(false),
-    customProjection_(false)
+    customProjection_(false),
+	isRainning_(false),
+	isSnowing_(false)
 {
     reflectionMatrix_ = reflectionPlane_.ReflectionMatrix();
 }
@@ -574,7 +576,12 @@ Quaternion Camera::GetFaceCameraRotation(const Vector3& position, const Quaterni
 Matrix3x4 Camera::GetEffectiveWorldTransform() const
 {
     Matrix3x4 worldTransform = node_ ? Matrix3x4(node_->GetWorldPosition(), node_->GetWorldRotation(), 1.0f) : Matrix3x4::IDENTITY;
-    return useReflection_ ? reflectionMatrix_ * worldTransform : worldTransform;
+#ifdef URHO3D_RIGHT_HANDED
+	worldTransform.m02_ *= -1.;
+	worldTransform.m12_ *= -1.;
+	worldTransform.m22_ *= -1.;
+#endif
+	return useReflection_ ? reflectionMatrix_ * worldTransform : worldTransform;
 }
 
 bool Camera::IsProjectionValid() const
@@ -633,7 +640,19 @@ Vector4 Camera::GetClipPlaneAttr() const
     return clipPlane_.ToVector4();
 }
 
-void Camera::OnNodeSet(Node* node)
+void Camera::SetIsRaining(bool enable)
+{
+	isRainning_ = enable;
+	MarkNetworkUpdate();
+}
+
+void Camera::SetIsSnowing(bool enable)
+{
+	isSnowing_ = enable;
+	MarkNetworkUpdate();
+}
+
+	void Camera::OnNodeSet(Node* node)
 {
     if (node)
         node->AddListener(this);

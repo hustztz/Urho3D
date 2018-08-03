@@ -131,6 +131,8 @@ public:
     void SetUpdateInvisible(bool enable);
     /// Set whether billboards are relative to the scene node.
     void SetRelative(bool enable);
+	/// 设置只跟随场景节点位置.
+	void SetOnlyFollowPosiont(bool enable);
     /// Set whether scene node scale affects billboards' size.
     void SetScaled(bool enable);
     /// Set whether billboards are sorted by distance.
@@ -229,6 +231,8 @@ public:
 
     /// Return whether billboards are relative to the scene node.
     bool IsRelative() const { return relative_; }
+	/// 返回是否只跟随场景节点位置
+	bool IsOnlyFollowPosition() const { return onlyFollowPosition_; }
 
     /// Return whether scene node scale affects billboards' size.
     bool IsScaled() const { return scaled_; }
@@ -358,6 +362,8 @@ private:
     bool updateInvisible_;
     /// Billboards relative flag.
     bool relative_;
+	/// relative flag为false时，是只跟随位置，还是即跟随位置，又跟随姿态
+	bool onlyFollowPosition_;
     /// Scale affects billboard scale flag.
     bool scaled_;
     /// Billboards sorted flag.

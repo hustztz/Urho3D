@@ -1,0 +1,5 @@
+<renderpath>
+	<rendertarget name="translucentDepth" sizedivisor="1 1" format="readabledepth" persistent="true" />
+	<command type="clear" depth="1.0" stencil="0" depthstencil="translucentDepth" />
+	<command type="scenepass" pass="translucent" output="viewport" depthstencil="translucentDepth" vertexlights="true" />
+</renderpath>

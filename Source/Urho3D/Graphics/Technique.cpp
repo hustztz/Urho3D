@@ -33,6 +33,7 @@
 #include "../Resource/XMLFile.h"
 
 #include "../DebugNew.h"
+#include "../../ThirdParty/SDL/src/core/windows/SDL_windows.h"
 
 namespace Urho3D
 {
@@ -82,7 +83,9 @@ Pass::Pass(const String& name) :
     alphaToCoverage_(false),
     depthWrite_(true),
 	enablePointSize_(true),
-    isDesktop_(false)
+    isDesktop_(false),
+	constantBias_(0.f),
+	slopeScaledBias_(0.f)
 {
     name_ = name.ToLower();
     index_ = Technique::GetPassIndex(name_);
@@ -120,6 +123,12 @@ void Pass::SetLightingMode(PassLightingMode mode)
 void Pass::SetDepthWrite(bool enable)
 {
     depthWrite_ = enable;
+}
+
+void Pass::SetDepthBias(float constantBias, float slopeScaledBias)
+{
+	this->constantBias_ = constantBias;
+	this->slopeScaledBias_ = slopeScaledBias;
 }
 
 void Pass::SetEnablePointSize(bool enable)
@@ -213,6 +222,23 @@ String Pass::GetEffectivePixelShaderDefines() const
         psDefines.Remove(psExcludes[i]);
 
     return String::Joined(psDefines, " ");
+}
+
+void Pass::CopyAllState(const Pass* pass)
+{
+	SetDepthTestMode(pass->GetDepthTestMode());
+	SetAlphaToCoverage(pass->GetAlphaToCoverage());
+	SetBlendMode(pass->GetBlendMode());
+	SetCullMode(pass->GetCullMode());
+	SetDepthBias(pass->GetDepthBiasConstantBias(), pass->GetDepthBiasSlopeScaledBias());
+	SetDepthWrite(pass->GetDepthWrite());
+	SetLightingMode(pass->GetLightingMode());
+	SetPixelShader(pass->GetPixelShader());
+	SetPixelShaderDefineExcludes(pass->GetPixelShaderDefineExcludes());
+	SetPixelShaderDefines(pass->GetPixelShaderDefines());
+	SetVertexShader(pass->GetVertexShader());
+	SetVertexShaderDefineExcludes(pass->GetVertexShaderDefineExcludes());
+	SetVertexShaderDefines(pass->GetVertexShaderDefines());
 }
 
 Vector<SharedPtr<ShaderVariation> >& Pass::GetVertexShaders(const StringHash& extraDefinesHash)
@@ -562,4 +588,11 @@ unsigned Technique::GetPassIndex(const String& passName)
     }
 }
 
+void Technique::RemoveAllPasses()
+{
+	for (int j = 0; j < GetPassNames().Size(); ++j)
+	{
+		RemovePass(GetPassNames()[j]);
+	}
+}
 }

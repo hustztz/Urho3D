@@ -112,7 +112,10 @@ public:
     VariantVector GetParticlesAttr() const;
     /// Return billboards attribute. Returns billboard amount only if particles are not to be serialized.
     VariantVector GetParticleBillboardsAttr() const;
-
+	/// 设置只跟随场景节点位置.
+	void SetOnlyFollowPosion(bool enable);
+	/// 返回是否只跟随场景节点位置
+	bool IsOnlyFollowPosition() const { return onlyFollowPosition_; }
 protected:
     /// Handle scene being assigned.
     void OnSceneSet(Scene* scene) override;
@@ -152,6 +155,8 @@ private:
     bool sendFinishedEvent_;
     /// Automatic removal mode.
     AutoRemoveMode autoRemove_;
+	/// relative flag为false时，是只跟随位置，还是即跟随位置，又跟随姿态
+	bool onlyFollowPosition_;
 };
 
 }

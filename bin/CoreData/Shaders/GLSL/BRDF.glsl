@@ -36,8 +36,8 @@
     //VdotH     = the dot product of the camera view direction and the half vector 
     vec3 Fresnel(vec3 specular, float VdotH, float LdotH)
     {
-        return SchlickFresnelCustom(specular, LdotH);
-        //return SchlickFresnel(specular, VdotH);
+        //return SchlickFresnelCustom(specular, LdotH); 
+        return SchlickFresnel(specular, VdotH);
     }
 
     // Smith GGX corrected Visibility
@@ -47,10 +47,10 @@
     float SmithGGXSchlickVisibility(float NdotL, float NdotV, float roughness)
     {
         float rough2 = roughness * roughness;
-        float lambdaV = NdotL  * sqrt((-NdotV * rough2 + NdotV) * NdotV + rough2);   
-        float lambdaL = NdotV  * sqrt((-NdotL * rough2 + NdotL) * NdotL + rough2);
+        float lambdaV = NdotV  + sqrt((-NdotV * rough2 + NdotV) * NdotV + rough2);   
+        float lambdaL = NdotL  + sqrt((-NdotL * rough2 + NdotL) * NdotL + rough2);
     
-        return 0.5 / (lambdaV + lambdaL);
+        return 1. / (lambdaV + lambdaL);
     }
 
     float NeumannVisibility(float NdotV, float NdotL) 
@@ -64,8 +64,8 @@
     // roughness    = the roughness of the pixel
     float Visibility(float NdotL, float NdotV, float roughness)
     {
-        return NeumannVisibility(NdotV, NdotL);
-        //return SmithGGXSchlickVisibility(NdotL, NdotV, roughness);
+        //return NeumannVisibility(NdotV, NdotL);
+        return SmithGGXSchlickVisibility(NdotL, NdotV, roughness);
     }
 
     // Blinn Distribution
@@ -96,7 +96,7 @@
     {
         float rough2 = roughness * roughness;
         float tmp =  (NdotH * rough2 - NdotH) * NdotH + 1.0;
-        return rough2 / (tmp * tmp);
+        return rough2 / (M_PI * tmp * tmp);
     }
 
     // Get Distribution
@@ -155,8 +155,8 @@
     // VdotH        = the camera view direction dot with the half vector
     vec3 Diffuse(vec3 diffuseColor, float roughness, float NdotV, float NdotL, float VdotH)
     {
-        //return LambertianDiffuse(diffuseColor);
-        return CustomLambertianDiffuse(diffuseColor, NdotV, roughness);
+        return LambertianDiffuse(diffuseColor);
+        //return CustomLambertianDiffuse(diffuseColor, NdotV, roughness);
         //return BurleyDiffuse(diffuseColor, roughness, NdotV, NdotL, VdotH);
     }
 

@@ -23,16 +23,18 @@ uniform vec4 cLightPos;
 uniform vec3 cLightDir;
 uniform vec4 cNormalOffsetScale;
 uniform mat4 cModel;
-uniform mat4 cView;
 uniform mat4 cViewInv;
 uniform mat4 cViewProj;
 uniform vec4 cUOffset;
 uniform vec4 cVOffset;
 uniform mat4 cZone;
+uniform bool cCameraOrtho;
 #if !defined(GL_ES) || defined(WEBGL)
     uniform mat4 cLightMatrices[4];
+	uniform mat4 cStaticLightMatrix;
 #else
     uniform highp mat4 cLightMatrices[2];
+	uniform mat4 cStaticLightMatrix;
 #endif
 #ifdef SKINNED
     uniform vec4 cSkinMatrices[MAXBONES*3];
@@ -44,6 +46,15 @@ uniform mat4 cZone;
     uniform vec4 cClipPlane;
 #endif
 #endif
+
+#if defined(GL_ES)
+	uniform mediump vec2 cGBufferInvSize;
+#else
+	uniform vec2 cGBufferInvSize;
+#endif
+uniform mat4 cView;
+uniform bool cHasSnow = false;
+uniform bool cHasRain = false;
 
 #ifdef COMPILEPS
 
@@ -59,7 +70,8 @@ uniform vec4 cDepthReconstruct;
 uniform float cElapsedTimePS;
 uniform vec4 cFogParams;
 uniform vec3 cFogColor;
-uniform vec2 cGBufferInvSize;
+uniform bool cIsFogging;
+
 uniform vec4 cLightColor;
 uniform vec4 cLightPosPS;
 uniform vec3 cLightDirPS;
@@ -84,6 +96,10 @@ uniform vec2 cShadowIntensity;
 uniform vec2 cShadowMapInvSize;
 uniform vec4 cShadowSplits;
 uniform mat4 cLightMatricesPS[4];
+uniform mat4 cStaticLightMatrixPS;
+uniform int cNumSplitsPS;
+uniform bool cEnableStaticShadow;
+uniform bool cCameraOrthoPS;
 #ifdef VSM_SHADOW
 uniform vec2 cVSMShadowParams;
 #endif

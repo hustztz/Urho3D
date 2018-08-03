@@ -117,6 +117,25 @@ void FrustumOctreeQuery::TestDrawables(Drawable** start, Drawable** end, bool in
     }
 }
 
+Intersection AllCastersQuery::TestOctant(const BoundingBox& box, bool inside)
+{
+	return INSIDE;;
+}
+
+void AllCastersQuery::TestDrawables(Drawable** start, Drawable** end, bool inside)
+{
+	while (start != end)
+	{
+		Drawable* drawable = *start++;
+
+		if ((drawable->GetDrawableFlags() & drawableFlags_) && (drawable->GetViewMask() & viewMask_))
+		{
+			if (drawable->GetCastShadows() && drawable->GetDynamicType() == dynamicType_)
+				result_.Push(drawable);
+		}
+	}
+}
+
 
 Intersection AllContentOctreeQuery::TestOctant(const BoundingBox& box, bool inside)
 {

@@ -171,27 +171,28 @@ namespace Urho3D
 					Drawable* drawable = dynamic_cast<Drawable*>(components[i].Get());		
 					if (!drawable)
 						continue;
-					for (int j = 0; j < drawable->GetBatches().Size(); ++j)
+					auto* pass = drawable->AddPass("outlineFill", "fill", "fill");
+					if (pass)
 					{
-						auto* pass = drawable->AddPass(j, "outlineFill", "fill", "fill");
-						if(pass)
-						{
-							pass->SetDepthTestMode(CompareMode::CMP_ALWAYS);
-						}
+						pass->SetDepthTestMode(CompareMode::CMP_ALWAYS);
 					}
 					if (color.a_ == 0.)
 					{
 						Color colorTemp(color.r_, color.g_, color.b_, alpha_);
-						for (int j = 0; j < drawable->GetBatches().Size(); ++j)
-						{
-							drawable->GetBatches().At(j).material_->SetShaderParameter("OutlineColor", colorTemp);
-						}
+//						for (int j = 0; j < drawable->GetBatches().Size(); ++j)
+//						{
+//							if(drawable->GetBatches().At(j).material_)
+//								drawable->GetBatches().At(j).material_->SetShaderParameter("OutlineColor", colorTemp);
+//						}
+						drawable->SetOverrideShaderParameter("OutlineColor", colorTemp);
 
 					} else
-						for (int j = 0; j < drawable->GetBatches().Size(); ++j)
-						{
-							drawable->GetBatches().At(j).material_->SetShaderParameter("OutlineColor", color);
-						}
+//						for (int j = 0; j < drawable->GetBatches().Size(); ++j)
+//						{
+//							if (drawable->GetBatches().At(j).material_)
+//								drawable->GetBatches().At(j).material_->SetShaderParameter("OutlineColor", color);
+//						}
+						drawable->SetOverrideShaderParameter("OutlineColor", color);
 				}
 			}
 		}
@@ -215,8 +216,10 @@ namespace Urho3D
 					Drawable* drawable = dynamic_cast<Drawable*>(components[i].Get());
 					if (!drawable)
 						continue;
-					for (int j = 0; j < drawable->GetBatches().Size(); ++j)
-						drawable->RemovePass(j, "outlineFill");
+//					for (int j = 0; j < drawable->GetBatches().Size(); ++j)
+//						drawable->RemovePass(j, "outlineFill");
+					drawable->RemovePass("outlineFill");
+					drawable->RemoveOverrideShaderParameter("OutlineColor");
 				}
 			}
 		}

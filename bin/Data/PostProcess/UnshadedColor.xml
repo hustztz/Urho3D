@@ -1,0 +1,5 @@
+<renderpath>
+	<command type="scenepass" pass="UnshadedColor" output="viewport" depthstencil="depth"	>
+		<parameter name="MatDiffColor" value="1 1 1 1" />
+	</command>		
+</renderpath>

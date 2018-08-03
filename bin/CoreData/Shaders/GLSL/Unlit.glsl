@@ -9,6 +9,9 @@ varying vec4 vWorldPos;
 #ifdef VERTEXCOLOR
     varying vec4 vColor;
 #endif
+#ifdef LOGDEPTH
+varying float positionW;
+#endif
 
 void VS()
 {
@@ -17,15 +20,20 @@ void VS()
     gl_Position = GetClipPos(worldPos);
     vTexCoord = GetTexCoord(iTexCoord);
     vWorldPos = vec4(worldPos, GetDepth(gl_Position));
-
+#ifdef LOGDEPTH
+	positionW = gl_Position.w;
+#endif	
     #ifdef VERTEXCOLOR
         vColor = iColor;
     #endif
-
 }
 
 void PS()
 {
+#ifdef LOGDEPTH
+	if(!cCameraOrthoPS)
+		gl_FragDepth = log2(1. + positionW)/log2(1. + cFarClipPS);
+#endif
     // Get material diffuse albedo
     #ifdef DIFFMAP
         vec4 diffColor = cMatDiffColor * texture2D(sDiffMap, vTexCoord);

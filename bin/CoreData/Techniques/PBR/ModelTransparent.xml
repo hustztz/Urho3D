@@ -1,0 +1,4 @@
+<technique vs="PBRLitSolid" ps="PBRLitSolid" psdefines="DIFFMAP PBR IBL">
+    <pass name="alpha" depthwrite="false" blend="alpha" cull="ccw" />
+    <pass name="shadow" vs="Shadow" ps="Shadow" psdefines="ALPHAMASK" />
+</technique>

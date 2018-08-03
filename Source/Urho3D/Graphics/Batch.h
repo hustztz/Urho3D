@@ -63,7 +63,9 @@ struct Batch
         numWorldTransforms_(rhs.numWorldTransforms_),
         instancingData_(rhs.instancingData_),
         lightQueue_(nullptr),
-        geometryType_(rhs.geometryType_)
+        geometryType_(rhs.geometryType_),
+		overrideShaderParameters_(nullptr),
+		overrideFillMode(FILL_SOLID)
     {
     }
 
@@ -106,6 +108,10 @@ struct Batch
     ShaderVariation* pixelShader_{};
     /// %Geometry type.
     GeometryType geometryType_{};
+	///override shader parameters，来自drawable的override shader参数
+	HashMap<StringHash, MaterialShaderParameter>* overrideShaderParameters_{};
+	///override render state
+	FillMode overrideFillMode;
 };
 
 /// Data for one geometry instance.
@@ -297,12 +303,16 @@ struct LightBatchQueue
     bool negative_;
     /// Shadow map depth texture.
     Texture2D* shadowMap_;
+	/// static shadow map depth texture.
+	Texture2D* staticShadowMap_;
     /// Lit geometry draw calls, base (replace blend mode)
     BatchQueue litBaseBatches_;
     /// Lit geometry draw calls, non-base (additive)
     BatchQueue litBatches_;
     /// Shadow map split queues.
     Vector<ShadowBatchQueue> shadowSplits_;
+	/// 静态阴影 queues.
+	ShadowBatchQueue staticShadow_;
     /// Per-vertex lights.
     PODVector<Light*> vertexLights_;
     /// Light volume draw calls.

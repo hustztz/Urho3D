@@ -141,7 +141,7 @@ bool Model::BeginLoad(Deserializer& source)
         {
             // If not async loading, use locking to avoid extra allocation & copy
             desc.data_.Reset(); // Make sure no previous data
-            buffer->SetShadowed(true);
+            buffer->SetShadowed(false);
             buffer->SetSize(desc.vertexCount_, desc.vertexElements_);
             void* dest = buffer->Lock(0, desc.vertexCount_);
             source.Read(dest, desc.vertexCount_ * vertexSize);
@@ -176,7 +176,7 @@ bool Model::BeginLoad(Deserializer& source)
         {
             // If not async loading, use locking to avoid extra allocation & copy
             loadIBData_[i].data_.Reset(); // Make sure no previous data
-            buffer->SetShadowed(true);
+            buffer->SetShadowed(false);
             buffer->SetSize(indexCount, indexSize > sizeof(unsigned short));
             void* dest = buffer->Lock(0, indexCount);
             source.Read(dest, indexCount * indexSize);
@@ -327,7 +327,7 @@ bool Model::EndLoad()
         VertexBufferDesc& desc = loadVBData_[i];
         if (desc.data_)
         {
-            buffer->SetShadowed(true);
+            buffer->SetShadowed(false);
             buffer->SetSize(desc.vertexCount_, desc.vertexElements_);
             buffer->SetData(desc.data_.Get());
         }
@@ -340,7 +340,7 @@ bool Model::EndLoad()
         IndexBufferDesc& desc = loadIBData_[i];
         if (desc.data_)
         {
-            buffer->SetShadowed(true);
+            buffer->SetShadowed(false);
             buffer->SetSize(desc.indexCount_, desc.indexSize_ > sizeof(unsigned short));
             buffer->SetData(desc.data_.Get());
         }

@@ -143,6 +143,7 @@ option (URHO3D_NAVIGATION "Enable navigation support" TRUE)
 # Urho's Network subsystem depends on kNet library which uses C++ exceptions feature
 cmake_dependent_option (URHO3D_NETWORK "Enable networking support" TRUE "NOT WEB AND EXCEPTIONS" FALSE)
 option (URHO3D_PHYSICS "Enable physics support" TRUE)
+option (URHO3D_OPENGL "Enable Opengl support" TRUE)
 option (URHO3D_URHO2D "Enable 2D graphics and physics support" TRUE)
 option (URHO3D_WEBP "Enable WebP support" TRUE)
 if (ARM AND NOT ANDROID AND NOT RPI AND NOT APPLE)
