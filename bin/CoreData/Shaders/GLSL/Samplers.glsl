@@ -1,3 +1,6 @@
+#ifdef COMPILEVS
+uniform sampler2D sDiffMap;
+#endif
 #ifdef COMPILEPS
 uniform sampler2D sDiffMap;
 uniform samplerCube sDiffCubeMap;

@@ -20,7 +20,7 @@ namespace Urho3D
 		virtual ~Filter(){}
 		virtual void Initial() = 0;
 		bool IsInitial() { return isInitialed_; }
-		void SetEnable(bool enable);
+		virtual void SetEnable(bool enable);
 		bool IsEnable() { return isEnable_; };
 		virtual void Update(float timeStep){};
 		virtual void PostUpdate(float timeStep) {};

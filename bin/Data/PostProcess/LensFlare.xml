@@ -1,0 +1,50 @@
+<renderpath>
+	<rendertarget name="lensFlare" tag="LensFlare" sizedivisor="2 2" format="rgb" filter="true" />
+	<rendertarget name="lensFlareBlur" tag="LensFlare" sizedivisor="2 2" format="rgb" filter="true" />
+	
+	<command type="clear" color="0.0 0.0 0.0 0.0"  output="lensFlare" />
+	
+	<command type="quad" tag="LensFlare" vs="LensFlare" ps="LensFlare" psdefines="SCALEFLARE1" blend="add" output="lensFlare">
+        <parameter name="LensFlareColor1" value="1.0 0.8 0.4 0.6" />
+        <parameter name="LensFlareScale1" value="0.3" />
+		<texture unit="diffuse" name="bright2" />
+    </command>
+	<command type="quad" tag="LensFlare" vs="LensFlare" ps="LensFlare" psdefines="SCALEFLARE2" blend="add" output="lensFlare">
+        <parameter name="LensFlareColor2" value="1.0 1.0 0.6 0.53" />
+        <parameter name="LensFlareScale2" value="0.1" />
+		<texture unit="diffuse" name="bright2" />
+    </command>	
+	<command type="quad" tag="LensFlare" vs="LensFlare" ps="LensFlare" psdefines="SCALEFLARE3" blend="add" output="lensFlare">
+        <parameter name="LensFlareColor3" value="0.8 0.8 1.0 0.46" />
+        <parameter name="LensFlareScale3" value="-0.1" />
+		<texture unit="diffuse" name="bright2" />
+    </command>	
+	<command type="quad" tag="LensFlare" vs="LensFlare" ps="LensFlare" psdefines="SCALEFLARE4" blend="add" output="lensFlare">
+        <parameter name="LensFlareColor4" value="0.5 1.0 0.4 0.39" />
+        <parameter name="LensFlareScale4" value="-0.3" />
+		<texture unit="diffuse" name="bright2" />
+    </command>	
+	<command type="quad" tag="LensFlare" vs="LensFlare" ps="LensFlare" psdefines="SCALEFLARE5" blend="add" output="lensFlare">
+        <parameter name="LensFlareColor5" value="0.5 0.8 1.0 0.31" />
+        <parameter name="LensFlareScale5" value="-0.5" />
+		<texture unit="diffuse" name="bright2" />
+    </command>	
+	<command type="quad" tag="LensFlare" vs="LensFlare" ps="LensFlare" psdefines="SCALEFLARE6" blend="add" output="lensFlare">
+        <parameter name="LensFlareColor6" value="0.9 1.0 0.8 0.27" />
+        <parameter name="LensFlareScale6" value="-1.0" />
+		<texture unit="diffuse" name="bright2" />
+    </command>	
+	<command type="quad" tag="LensFlare" vs="LensFlare" ps="LensFlare" psdefines="SCALEFLARE7" blend="add" output="lensFlare">
+        <parameter name="LensFlareColor7" value="1.0 0.8 0.4 0.15" />
+        <parameter name="LensFlareScale7" value="-1.8" />
+		<texture unit="diffuse" name="bright2" />
+    </command>	
+
+	<command type="clear" color="0.0 0.0 0.0 0.0"  output="lensFlareBlur" />	
+	<command type="sendevent" tag="LensFlare" name="LensFlareBlur" />
+	
+	<command type="quad" tag="LensFlare" vs="CopyFramebuffer" ps="CopyFramebuffer" blend="add" output="viewport">
+        <texture unit="diffuse" name="lensFlareBlur" />
+    </command>
+    
+</renderpath>

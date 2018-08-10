@@ -919,7 +919,37 @@ void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount
     ++numBatches_;
 #endif
 }
+void Graphics::DrawArraysInstanced(PrimitiveType type, unsigned vertexStart, unsigned vertexCount, unsigned instanceCount)
+{
+#if !defined(GL_ES_VERSION_2_0) || defined(__EMSCRIPTEN__)
+	if (!instancingSupport_)
+		return;
 
+	PrepareDraw();
+
+	unsigned indexSize = indexBuffer_->GetIndexSize();
+	unsigned primitiveCount;
+	GLenum glPrimitiveType;
+
+	GetGLPrimitiveType(vertexCount, type, primitiveCount, glPrimitiveType);
+	GLenum indexType = indexSize == sizeof(unsigned short) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+#ifdef __EMSCRIPTEN__
+	glDrawArraysInstanced(glPrimitiveType, vertexStart, vertexCount, instanceCount);
+#else
+	if (gl3Support)
+	{
+		glDrawArraysInstanced(glPrimitiveType, vertexStart, vertexCount, instanceCount);
+	}
+	else
+	{
+		glDrawArraysInstanced(glPrimitiveType, vertexStart, vertexCount, instanceCount);
+	}
+#endif
+
+	numPrimitives_ += instanceCount * primitiveCount;
+	++numBatches_;
+#endif
+}
 void Graphics::DrawInstanced(PrimitiveType type, unsigned indexStart, unsigned indexCount, unsigned minVertex, unsigned vertexCount,
     unsigned instanceCount)
 {

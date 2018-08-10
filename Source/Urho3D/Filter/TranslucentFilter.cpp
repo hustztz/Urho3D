@@ -119,7 +119,7 @@ namespace Urho3D
 						overridepass->CopyAllState(pass);
 						overridepass->SetDepthTestMode(CMP_LESS);
 						overridepass->SetDepthWrite(true);
-						overridepass->SetLightingMode(LIGHTING_PERVERTEX);
+						overridepass->SetLightingMode(LIGHTING_PERPIXEL);
 //						overridepass->SetPixelShaderDefines(overridepass->GetPixelShaderDefines() + " PERPIXEL");
 						drawable->SetOverrideTechnique(overrideTech);
 					}

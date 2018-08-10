@@ -191,7 +191,7 @@ void PS()
 	if(cHasSnow)
 	{
 		roughness = mix(roughness, 1., snowFactor);
-		diffColor.rgb = mix(diffColor.rgb, vec3(1.), snowFactor);
+		diffColor.rgb = mix(diffColor.rgb, vec3(0.6), snowFactor);
 	//	specColor.rgb = mix(specColor.rgb, vec3(1.), snowFactor);
 	}
 

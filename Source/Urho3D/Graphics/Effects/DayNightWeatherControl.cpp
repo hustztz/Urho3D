@@ -9,6 +9,7 @@
 #include "Core/Context.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Zone.h"
+#include "Math/MathDefs.h"
 #include <chrono>
 #include <ctime>
 #include <iomanip>
@@ -26,17 +27,16 @@ namespace Urho3D
 		earthRadius(6360e3),
 		Hr(7994),
 		Hm(1200),
-		///betaR(3.8e-6f, 13.5e-6f, 33.1e-6f),
-		betaR(3.8e-6f*3.1f, 13.5e-6f*1.7f, 33.1e-6f),
-		betaM(21e-6f, 21e-6f, 21e-6f),
-		dayValue_(30.f),
+		betaR(3.8e-6f, 13.5e-6f, 33.1e-6f),
+		//betaR(3.8e-6f*3.1f, 13.5e-6f*1.7f, 33.1e-6f),		betaM(21e-6f, 21e-6f, 21e-6f),
+		dayValue_(20.f),
 		nightValue_(3.f),
 		indirectColor_(1., 1., 1.),
 		isDynamic_(true),
 		isSystemTiming_(true),
 		speed_(1.f),
 		weatherRatio_(0.5),
-		isHDR_(false)
+		isHDR_(true)
 	{
 		// Only the scene update event is needed: unsubscribe from the rest for optimization
 		SetUpdateEventMask(USE_UPDATE);
@@ -61,11 +61,21 @@ namespace Urho3D
 		URHO3D_ATTRIBUTE("UseSystemTime", bool, isSystemTiming_, true, AM_DEFAULT);
 		URHO3D_ATTRIBUTE("Speed", float, speed_, 1.f, AM_DEFAULT);
 		URHO3D_ATTRIBUTE("WeatherRatio", float, weatherRatio_, 0.5f, AM_DEFAULT);
-		URHO3D_ATTRIBUTE("HDR", bool, isHDR_, false, AM_DEFAULT);
+		URHO3D_ACCESSOR_ATTRIBUTE("HDR", GetEnableHDR, EnableHDR, bool, true, AM_DEFAULT);
 	}
+
 	void DayNightWeatherControl::EnableHDR(bool enable)
 	{
-		isHDR_ = enable;
+		auto* skybox = skyBoxNode_->GetComponent<Skybox>();
+		auto* cache = GetSubsystem<ResourceCache>();
+		if (isHDR_ != enable)
+		{
+			isHDR_ = enable;
+			if (isHDR_)
+				skybox->SetMaterial(cache->GetResource<Material>("Materials/DynamicHDRSkybox.xml"));
+			else
+				skybox->SetMaterial(cache->GetResource<Material>("Materials/DynamicSkybox.xml"));
+		}
 	}
 	Zone * DayNightWeatherControl::GetZone()
 	{
@@ -90,6 +100,8 @@ namespace Urho3D
 		//zone->SetAmbientColor(Color(0, 0, 0, 0.2));
 		//	zone->SetZoneTexture(cache->GetResource<TextureCube>("Textures/Skybox.xml"));
 		zone->SetBoundingBox(BoundingBox(Vector3(-1000, -1000, -1000), Vector3(1000, 1000, 1000)));
+		zone->EnableFog(false);
+		zone->SetCastShadows(false);
 		//	zone->SetFogStart(100);
 		//	//zone->SetFogColor(Color(0.4f, 0.5f, 0.8f));
 		//	zone->SetFogEnd(3000);
@@ -97,6 +109,18 @@ namespace Urho3D
 		//	zone->EnableFog(false);
 		//	WeatherEffectUtil::SetFogEffect(zone, 100, 3000, Color(4, 4, 4));
 		//	WeatherEffectUtil::CancelFogEffect(zone);
+
+
+		skyBoxNode_ = scene->CreateChild("Sky");
+		skyBoxNode_->SetScale(50.f); // The scale actually does not matter
+		auto* skybox = skyBoxNode_->CreateComponent<Skybox>();
+		auto* cache = GetSubsystem<ResourceCache>();
+		skybox->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+		skybox->SetCastShadows(false);
+		if (isHDR_)
+			skybox->SetMaterial(cache->GetResource<Material>("Materials/DynamicHDRSkybox.xml"));
+		else
+			skybox->SetMaterial(cache->GetResource<Material>("Materials/DynamicSkybox.xml"));
 	}
 	void DayNightWeatherControl::DelayedStart()
 	{
@@ -117,17 +141,8 @@ namespace Urho3D
 		//light->SetUsePhysicalValues(true);
 		light->SetShadowBias(BiasParameters(0.00025f, 0.5f));
 		light->SetShadowCascade(CascadeParameters(10.0f, 50.0f, 500000.0f, 0.0f, 0.8f));
-		light->SetShadowIntensity(0.0);
+		light->SetShadowIntensity(0.5);
 
-		skyBoxNode_ = scene->CreateChild("Sky");
-		skyBoxNode_->SetScale(50.f); // The scale actually does not matter
-		auto* skybox = skyBoxNode_->CreateComponent<Skybox>();
-		auto* cache = GetSubsystem<ResourceCache>();
-		skybox->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-		if(isHDR_)
-			skybox->SetMaterial(cache->GetResource<Material>("Materials/DynamicHDRSkybox.xml"));
-		else
-			skybox->SetMaterial(cache->GetResource<Material>("Materials/DynamicSkybox.xml"));
 	}
 	void DayNightWeatherControl::UpdateSun()
 	{
@@ -190,18 +205,38 @@ namespace Urho3D
 		if(zoneNode_)
 		{
 			auto* zone = zoneNode_->GetComponent<Zone>();
-			float ambientColor = Max(Max(indirectColor_.x_, indirectColor_.y_), indirectColor_.z_) * 0.1f;
+//			float ambientColor = Max(Max(indirectColor_.x_, indirectColor_.y_), indirectColor_.z_) * 0.1f;
+//			if (!isHDR_)
+//			{
+//				if (ambientColor < 0.3)
+//					ambientColor = 0.3;
+//			}else
+//			{
+//				if (ambientColor < 0.8)
+//					ambientColor = 0.8;
+//			}
+			//URHO3D_LOGERROR(String("Ambient:") + ambientColor);
+			Vector3 ambientColor = ComputeAmbientLight(Vector3(0, earthRadius, 0), Vector3(0,1,0), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_))*1.4;
+			ambientColor += ComputeAmbientLight(Vector3(0, earthRadius, 0), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_))*1.4;
+			float maxAmbinetColor = Max(Max(ambientColor.x_, ambientColor.y_), ambientColor.z_);
+			ambientColor += Vector3(maxAmbinetColor, maxAmbinetColor, maxAmbinetColor);
 			if (!isHDR_)
 			{
-				if (ambientColor < 0.3)
-					ambientColor = 0.3;
-			}else
+				if (ambientColor.z_ < 0.4)
+				{
+					ambientColor.Normalize();
+					ambientColor = ambientColor * 0.4;
+				}
+
+			} else
 			{
-				if (ambientColor < 0.8)
-					ambientColor = 0.8;
+				if (ambientColor.z_ < 0.8)
+				{
+					ambientColor.Normalize();
+					ambientColor = ambientColor * 0.8;
+				}
 			}
-			//URHO3D_LOGERROR(String("Ambient:") + ambientColor);
-			zone->SetAmbientColor(Color(ambientColor, ambientColor, ambientColor, 1.f));
+			zone->SetAmbientColor(Color(ambientColor.x_, ambientColor.y_, ambientColor.z_, 1.f));
 		}
 	}
 	void DayNightWeatherControl::UpdateTime( float timeStep)
@@ -285,55 +320,110 @@ namespace Urho3D
 	Vector3 DayNightWeatherControl::ComputeIncidentLight(Vector3 orig, Vector3 sunDirection)
 	{
 		float t0, t1;
-		unsigned int numSamplesLight = 8;
-		float t0Light = 0, t1Light = 0;
-		bool b = RaySphereIntersect(orig, sunDirection, atmosphereRadius, t0Light, t1Light);
-		float segmentLengthLight = t1Light / numSamplesLight, tCurrentLight = 0;
-		float opticalDepthLightR = 0, opticalDepthLightM = 0;
-		Vector3 samplePositionLight;
-		
-		for (unsigned int j = 0; j < numSamplesLight; ++j)
-		{
-			samplePositionLight = orig+(sunDirection*(tCurrentLight + segmentLengthLight * 0.5f));			
-			float heightLight = samplePositionLight.Length() - earthRadius;
-			if (heightLight < 0) break;
-			opticalDepthLightR += exp(-heightLight / Hr) * segmentLengthLight;
-			opticalDepthLightM += exp(-heightLight / Hm) * segmentLengthLight;
-			tCurrentLight += segmentLengthLight;
+		if (!RaySphereIntersect(orig, sunDirection, atmosphereRadius, t0, t1) || t1 < 0) return Vector3(0);
+		float tmin = 0, tmax = std::numeric_limits<float>::max();
+		if (t0 > tmin && t0 > 0) tmin = t0;
+		if (t1 < tmax) tmax = t1;
+		uint32_t numSamples = 16;
+		const float segmentLength = (tmax - tmin) / numSamples;
+		float tCurrent = tmin;
+		float opticalDepthR = 0, opticalDepthM = 0;
 
+		for (uint32_t i = 0; i < numSamples; ++i) {
+			Vector3 samplePosition = orig + (tCurrent + segmentLength * 0.5f) * sunDirection;;
+			float height = samplePosition.Length() - earthRadius;
+			// compute optical depth for light
+			float hr = exp(-height / Hr) * segmentLength;
+			float hm = exp(-height / Hm) * segmentLength;
+			opticalDepthR += hr;
+			opticalDepthM += hm;
+			tCurrent += segmentLength;
 		}
+		Vector3 tau = betaR * (opticalDepthR)+betaM * 1.1f * (opticalDepthM);
+		Vector3 attenuation(exp(-tau.x_), exp(-tau.y_), exp(-tau.z_));
 
-		float Tx = exp(-(betaR*opticalDepthLightR).x_ - (betaM*opticalDepthLightM).x_);
-		float Ty = exp(-(betaR*opticalDepthLightR).y_ - (betaM*opticalDepthLightM).y_);
-		float Tz = exp(-(betaR*opticalDepthLightR).z_ - (betaM*opticalDepthLightM).z_);
+		float value = dayValue_*1.4;
 
-		float value = dayValue_;
-		float nightvalue = nightValue_;
+		if (hour_ < 6 || hour_ > 18)
+		{
+			value = nightValue_;
+			float maxAttenuation = Max(Max(attenuation.x_, attenuation.y_), attenuation.z_);
+			attenuation.x_ = maxAttenuation;
+			attenuation.y_ = maxAttenuation;
+			attenuation.z_ = maxAttenuation;
+		}
 		if (!isHDR_)
 		{
-			value = dayValue_/5.;
-			nightvalue = nightValue_ / 5.;
+
+			attenuation /= 4;
 		}
 
-		//		System.out.println(T.mult(3.f));	
-		if (hour_ < 6. || hour_ > 18.)
-		{
-			//float factor = Clamp((hour_ - 18.) / 1., 0., 1.) + Clamp((6. - hour_) / 1., 0., 1.);
-			//value = value * (1. - factor) + nightvalue * factor;
-			value = nightvalue;
-			Tx *= value;
-			//Tx = (Tx < 1.4) ? 1.4 : Tx;
-			//			URHO3D_LOGERROR("directcolor:" + (Vector3(Tx, Ty, Tz)).ToString());
-			return Vector3(Tx, Tx, Tx);
-		}
-		Tx *= value;
-		Ty *= value;
-		Tz *= value;
-		//Tx = (Tx < 3.0) ? 3. : Tx;
-		//Ty = (Ty < 1.0) ? 1. : Ty;
-		//Tz = (Tz < 0.3) ? 0.3 : Tz;
-		//		URHO3D_LOGERROR("directcolor:" + (Vector3(Tx, Ty, Tz)).ToString());
-		return Vector3(Tx, Ty, Tz);
+		//URHO3D_LOGERROR("INDIRECT:" + attenuation.ToString());
+		return attenuation * value;
 		
+	}
+	Vector3 DayNightWeatherControl::ComputeAmbientLight(Vector3 orig, Vector3 dir, Vector3 sunDirection)
+	{
+		float t0, t1;
+		dir.Normalize();
+		float tmin = 0, tmax = std::numeric_limits<float>::max();
+		if (!RaySphereIntersect(orig, dir, atmosphereRadius, t0, t1) || t1 < 0) return Vector3::ZERO;
+		if (t0 > tmin && t0 > 0) tmin = t0;
+		if (t1 < tmax) tmax = t1;
+		uint32_t numSamples = 16;
+		uint32_t numSamplesLight = 8;
+		float segmentLength = (tmax - tmin) / numSamples;
+		float tCurrent = tmin;
+		Vector3 sumR, sumM; // mie and rayleigh contribution
+		float opticalDepthR = 0, opticalDepthM = 0;
+		float mu = dir.DotProduct(sunDirection); // mu in the paper which is the cosine of the angle between the sun direction and the ray direction
+		float phaseR = 3.f / (16.f * M_PI) * (1 + mu * mu);
+		float g = 0.76f;
+		float phaseM = 3.f / (8.f * M_PI) * ((1.f - g * g) * (1.f + mu * mu)) / ((2.f + g * g) * pow(1.f + g * g - 2.f * g * mu, 1.5f));
+		for (uint32_t i = 0; i < numSamples; ++i) {
+			Vector3 samplePosition = orig + (tCurrent + segmentLength * 0.5f) * dir;
+			float height = samplePosition.Length() - earthRadius;
+			// compute optical depth for light
+			float hr = exp(-height / Hr) * segmentLength;
+			float hm = exp(-height / Hm) * segmentLength;
+			opticalDepthR += hr;
+			opticalDepthM += hm;
+			// light optical depth
+			float t0Light, t1Light;
+			RaySphereIntersect(samplePosition, sunDirection, atmosphereRadius, t0Light, t1Light);
+			float segmentLengthLight = t1Light / numSamplesLight, tCurrentLight = 0;
+			float opticalDepthLightR = 0, opticalDepthLightM = 0;
+			uint32_t j;
+			for (j = 0; j < numSamplesLight; ++j) {
+				Vector3 samplePositionLight = samplePosition + (tCurrentLight + segmentLengthLight * 0.5f) * sunDirection;
+				float heightLight = samplePositionLight.Length() - earthRadius;
+				if (heightLight < 0) break;
+				opticalDepthLightR += exp(-heightLight / Hr) * segmentLengthLight;
+				opticalDepthLightM += exp(-heightLight / Hm) * segmentLengthLight;
+				tCurrentLight += segmentLengthLight;
+			}
+			if (j == numSamplesLight) {
+				Vector3 tau = betaR * (opticalDepthR + opticalDepthLightR) + betaM * 1.1f * (opticalDepthM + opticalDepthLightM);
+				Vector3 attenuation(exp(-tau.x_), exp(-tau.y_), exp(-tau.z_));
+				sumR += attenuation * hr;
+				sumM += attenuation * hm;
+			}
+			tCurrent += segmentLength;
+		}
+
+		float value = dayValue_;
+
+		if (hour_ < 6 || hour_ > 18)
+		{
+			value = nightValue_;
+		}
+		if (!isHDR_)
+		{
+
+			value /= 3;
+		}
+		// We use a magic number here for the intensity of the sun (20). We will make it more
+		// scientific in a future revision of this lesson/code
+		return (sumR * betaR * phaseR + sumM * betaM * phaseM) * value;
 	}
 }

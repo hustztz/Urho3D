@@ -117,6 +117,10 @@ public:
     void SetZoneTextureAttr(const ResourceRef& value);
     /// Return zone texture attribute.
     ResourceRef GetZoneTextureAttr() const;
+	/// 启用或雾效
+	void EnableFog(bool enable) { isFogging_ = enable; }
+	/// 查询是否已启用雾效
+	bool IsFogging() const { return isFogging_; }
 
 protected:
     /// Handle node transform being dirtied.
@@ -168,6 +172,8 @@ protected:
     WeakPtr<Zone> lastAmbientStartZone_;
     /// Last zone used for ambient gradient end color.
     WeakPtr<Zone> lastAmbientEndZone_;
+	/// 是否启用雾效
+	bool isFogging_;
 };
 
 }

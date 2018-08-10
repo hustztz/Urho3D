@@ -86,4 +86,12 @@ vec3 ToInverseGamma(vec3 color)
 {
     return vec3(pow(color.r, InverseGamma), pow(color.g, InverseGamma), pow(color.b, InverseGamma));
 }
+
 #endif
+
+// uv 0..1
+float DiscMask(vec2 uv)
+{
+	vec2 mask2 = uv * (1. - uv);
+	return mask2.x * mask2.y * 8.0;
+}

@@ -51,6 +51,7 @@
 #include "../UI/UI.h"
 
 #include "../DebugNew.h"
+#include "../Graphics/Technique.h"
 
 namespace Urho3D
 {
@@ -1333,6 +1334,10 @@ void View::GetBaseBatches()
                 }
                 else
                     destBatch.lightQueue_ = nullptr;
+				if(info.passIndex_ == Technique::GetPassIndex("translucent") && lightQueues_.Size() > 0)
+				{
+					destBatch.lightQueue_ = &lightQueues_[0];
+				}
 
                 bool allowInstancing = info.allowInstancing_;
                 if (allowInstancing && info.markToStencil_ && destBatch.lightMask_ != (destBatch.zone_->GetLightMask() & 0xffu))
@@ -1662,28 +1667,29 @@ void View::ExecuteRenderPathCommands()
             case CMD_SCENEPASS:
                 {
                     BatchQueue& queue = actualView->batchQueues_[command.passIndex_];
-                    if (!queue.IsEmpty())
-                    {
-                        URHO3D_PROFILE(RenderScenePass);
 
-                        SetRenderTargets(command);
-                        bool allowDepthWrite = SetTextures(command);
-                        graphics_->SetClipPlane(camera_->GetUseClipping(), camera_->GetClipPlane(), camera_->GetView(),
-                            camera_->GetGPUProjection());
+					if (!queue.IsEmpty())
+					{
+						URHO3D_PROFILE(RenderScenePass);
 
-                        if (command.shaderParameters_.Size())
-                        {
-                            // If pass defines shader parameters, reset parameter sources now to ensure they all will be set
-                            // (will be set after camera shader parameters)
-                            graphics_->ClearParameterSources();
-                            passCommand_ = &command;
-                        }
+						SetRenderTargets(command);
+						bool allowDepthWrite = SetTextures(command);
+						graphics_->SetClipPlane(camera_->GetUseClipping(), camera_->GetClipPlane(), camera_->GetView(),
+							camera_->GetGPUProjection());
 
-                        queue.Draw(this, camera_, command.markToStencil_, false, allowDepthWrite);
+						if (command.shaderParameters_.Size())
+						{
+							// If pass defines shader parameters, reset parameter sources now to ensure they all will be set
+							// (will be set after camera shader parameters)
+							graphics_->ClearParameterSources();
+							passCommand_ = &command;
+						}
 
-                        passCommand_ = nullptr;
-                    }
-                }
+						queue.Draw(this, camera_, command.markToStencil_, false, allowDepthWrite);
+
+						passCommand_ = nullptr;
+					}
+				}
                 break;
 
             case CMD_QUAD:

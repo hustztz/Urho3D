@@ -138,6 +138,8 @@ public:
     void Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount, unsigned minVertex, unsigned vertexCount);
     /// Draw indexed geometry with vertex index offset.
     void Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex, unsigned minVertex, unsigned vertexCount);
+	/// Draw non-indexed, instanced geometry.
+	void DrawArraysInstanced(PrimitiveType type, unsigned vertexStart, unsigned vertexCount, unsigned instanceCount);
     /// Draw indexed, instanced geometry. An instancing vertex buffer must be set.
     void DrawInstanced(PrimitiveType type, unsigned indexStart, unsigned indexCount, unsigned minVertex, unsigned vertexCount,
         unsigned instanceCount);
@@ -228,7 +230,7 @@ public:
     void SetDepthTest(CompareMode mode);
     /// Set depth write on/off.
     void SetDepthWrite(bool enable);
-	/// Set depth write on/off.
+	/// Set point size on/off.
 	void SetEnablePointSize(bool enable);
     /// Set polygon fill mode.
     void SetFillMode(FillMode mode);
@@ -449,8 +451,8 @@ public:
 
     /// Return whether depth write is enabled.
     bool GetDepthWrite() const { return depthWrite_; }
-
-	/// Return depth write mode.
+	
+	/// Return whether point size is enabled.
 	bool EnablePointSize() const { return enablePointSize_; }
 
     /// Return polygon fill mode.
@@ -751,9 +753,9 @@ private:
     /// Depth compare mode.
     CompareMode depthTestMode_{};
     /// Depth write enable flag.
+    bool depthWrite_{};
+	/// Point size enable flag.
     bool enablePointSize_{};
-	/// Depth write enable flag.
-	bool depthWrite_{};
     /// Line antialiasing enable flag.
     bool lineAntiAlias_{};
     /// Polygon fill mode.

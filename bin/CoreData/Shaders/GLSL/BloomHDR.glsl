@@ -38,19 +38,19 @@ void PS()
     #endif
 
     #ifdef BLUR16
-    gl_FragColor = GaussianBlur(BlurKernelSize, cBloomHDRBlurDir, cBright16InvSize * cBloomHDRBlurRadius, cBloomHDRBlurSigma, sDiffMap, vScreenPos);
+    gl_FragColor = GaussianBlur(BlurKernelSize, cBloomHDRBlurDir, cGBufferInvSize / 16. * cBloomHDRBlurRadius, cBloomHDRBlurSigma, sDiffMap, vScreenPos);
     #endif
 
     #ifdef BLUR8
-    gl_FragColor = GaussianBlur(BlurKernelSize, cBloomHDRBlurDir, cBright8InvSize * cBloomHDRBlurRadius, cBloomHDRBlurSigma, sDiffMap, vScreenPos);
+    gl_FragColor = GaussianBlur(BlurKernelSize, cBloomHDRBlurDir, cGBufferInvSize / 8. * cBloomHDRBlurRadius, cBloomHDRBlurSigma, sDiffMap, vScreenPos);
     #endif
 
     #ifdef BLUR4
-    gl_FragColor = GaussianBlur(BlurKernelSize, cBloomHDRBlurDir, cBright4InvSize * cBloomHDRBlurRadius, cBloomHDRBlurSigma, sDiffMap, vScreenPos);
+    gl_FragColor = GaussianBlur(BlurKernelSize, cBloomHDRBlurDir, cGBufferInvSize / 4. * cBloomHDRBlurRadius, cBloomHDRBlurSigma, sDiffMap, vScreenPos);
     #endif
 
     #ifdef BLUR2
-    gl_FragColor = GaussianBlur(BlurKernelSize, cBloomHDRBlurDir, cBright2InvSize * cBloomHDRBlurRadius, cBloomHDRBlurSigma, sDiffMap, vScreenPos);
+    gl_FragColor = GaussianBlur(BlurKernelSize, cBloomHDRBlurDir, cGBufferInvSize / 2. * cBloomHDRBlurRadius, cBloomHDRBlurSigma, sDiffMap, vScreenPos);
     #endif
 
     #ifdef COMBINE16

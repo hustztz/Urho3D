@@ -175,6 +175,7 @@ namespace Urho3D
 					if (pass)
 					{
 						pass->SetDepthTestMode(CompareMode::CMP_ALWAYS);
+						pass->SetDepthWrite(false);
 					}
 					if (color.a_ == 0.)
 					{

@@ -21,6 +21,7 @@ namespace Urho3D
 		float GetHour() const { return hour_; }
 		void SetWeatherRatio(float ratio) { weatherRatio_ = ratio; }
 		void EnableHDR(bool enable);
+		bool GetEnableHDR() const { return isHDR_;}
 		Zone* GetZone();
 		Vector3 GetIndrectColor(){ return indirectColor_; }
 	private:
@@ -35,6 +36,7 @@ namespace Urho3D
 		void Swap(float& t0, float& t1);
 		bool RaySphereIntersect(Vector3 orig, Vector3 dir, float radius, float& t0, float& t1);
 		Vector3 ComputeIncidentLight(Vector3 orig, Vector3 sunDirection/* , float tmin, float tmax */);
+		Vector3 ComputeAmbientLight(Vector3 orig, Vector3 dir, Vector3 sunDirection/* , float tmin, float tmax */);
 		WeakPtr<Node> sunNode_{};
 		WeakPtr<Node> skyBoxNode_{};
 		WeakPtr<Node> zoneNode_{};

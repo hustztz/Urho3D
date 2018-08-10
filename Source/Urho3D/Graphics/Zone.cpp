@@ -59,7 +59,8 @@ Zone::Zone(Context* context) :
     fogEnd_(DEFAULT_FOG_END),
     fogHeight_(DEFAULT_FOG_HEIGHT),
     fogHeightScale_(DEFAULT_FOG_HEIGHT_SCALE),
-    priority_(0)
+    priority_(0),
+	isFogging_(true)
 {
     boundingBox_ = BoundingBox(DEFAULT_BOUNDING_BOX_MIN, DEFAULT_BOUNDING_BOX_MAX);
 }
