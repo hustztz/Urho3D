@@ -43,6 +43,9 @@
                         <element type="Text" style="EditorEnumAttributeText">
                             <attribute name="Text" value="Color" />
                         </element>
+						<element type="Text" style="EditorEnumAttributeText">
+                            <attribute name="Text" value="Int64" />
+                        </element>
                     </element>
                 </element>
             </element>

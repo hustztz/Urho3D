@@ -38,7 +38,10 @@ void CreateRootUIElement()
     SubscribeToEvent(editorUIElement, "ElementRemoved", "HandleUIElementRemoved");
 
     // Since this root UIElement is not being handled by above handlers, update it into hierarchy list manually as another list root item
-    UpdateHierarchyItem(M_MAX_UNSIGNED, editorUIElement, null);
+    if(!hideUIEditor)
+    {
+        UpdateHierarchyItem(M_MAX_UNSIGNED, editorUIElement, null);
+    }
 }
 
 bool NewUIElement(const String&in typeName)

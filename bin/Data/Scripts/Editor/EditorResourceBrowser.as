@@ -53,7 +53,8 @@ const int RESOURCE_TYPE_PARTICLEEMITTER = 21;
 const int RESOURCE_TYPE_2D_ANIMATION_SET = 22;
 const int RESOURCE_TYPE_GENERIC_XML = 23;
 const int RESOURCE_TYPE_GENERIC_JSON = 24;
-
+//新添类型
+const int RESOURCE_TYPE_POINTCLOUD = 25;
 // any resource type > 0 is valid
 const int NUMBER_OF_VALID_RESOURCE_TYPES = 24;
 
@@ -126,6 +127,8 @@ const StringHash EXTENSION_TYPE_GLSL(".glsl");
 const StringHash EXTENSION_TYPE_FRAGMENTSHADER(".frag");
 const StringHash EXTENSION_TYPE_VERTEXSHADER(".vert");
 const StringHash EXTENSION_TYPE_HTML(".html");
+//新增加类型
+const StringHash EXTENSION_TYPE_POINTCLOUD(".vxl");
 
 const StringHash TEXT_VAR_FILE_ID("browser_file_id");
 const StringHash TEXT_VAR_DIR_ID("browser_dir_id");
@@ -150,6 +153,7 @@ void CreateResourceBrowser()
     CreateResourceBrowserUI();
     InitResourceBrowserPreview();
     RebuildResourceDatabase();
+    HideResourceBrowserWindow();
 }
 
 void RebuildResourceDatabase()
@@ -1218,6 +1222,8 @@ int GetResourceType(StringHash fileType)
         return RESOURCE_TYPE_UNUSABLE;
     else if(fileType == EXTENSION_TYPE_HTML)
         return RESOURCE_TYPE_UNUSABLE;
+    else if(fileType == EXTENSION_TYPE_POINTCLOUD)
+        return RESOURCE_TYPE_POINTCLOUD;
 
     return RESOURCE_TYPE_UNKNOWN;
 }
@@ -1273,6 +1279,8 @@ bool GetExtensionType(String path, StringHash &out fileType)
         fileType = EXTENSION_TYPE_VERTEXSHADER;
     else if(type == EXTENSION_TYPE_HTML)
         fileType = EXTENSION_TYPE_HTML;
+    else if(type == EXTENSION_TYPE_POINTCLOUD)
+        fileType = EXTENSION_TYPE_POINTCLOUD;
     else
         return false;
 
@@ -1453,6 +1461,8 @@ String ResourceTypeName(int resourceType)
         return "Cubemap";
     else if (resourceType == RESOURCE_TYPE_2D_ANIMATION_SET)
         return "2D Animation Set";
+    else if (resourceType == RESOURCE_TYPE_POINTCLOUD)
+        return "PointCloud";
     else
         return "";
 }

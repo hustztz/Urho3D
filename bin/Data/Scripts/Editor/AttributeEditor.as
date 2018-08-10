@@ -31,6 +31,9 @@ Array<String> noTextChangedAttrs = {"Script File", "Class Name", "Script Object 
 // List of attributes that should be created with a bit selection editor
 const Array<String> bitSelectionAttrs = {"Collision Mask", "Collision Layer", "Light Mask", "Zone Mask", "View Mask", "Shadow Mask"};
 
+//lod 特殊的编辑属性
+const String LodEditorAttrName = "LODInfo";
+
 // Number of editable bits for bit selection editor
 const int MAX_BITMASK_BITS = 8;
 const int MAX_BITMASK_VALUE = (1 << MAX_BITMASK_BITS) - 1;
@@ -307,6 +310,11 @@ UIElement@ CreateIntAttributeEditor(ListView@ list, Array<Serializable@>@ serial
     {
         LineEdit@ attrEdit = CreateAttributeBitSelector(parent, serializables, index, subIndex);
     }
+    else if(LodEditorAttrName == info.name)
+    {
+        Button@ openBtn = CreateResourcePickerButton(parent, serializables, index, subIndex, "smallButtonEdit");
+        SubscribeToEvent(openBtn, "Released", "EditLodInfoAttribute");
+    }
     // Check for enums
     else if (info.enumNames is null || info.enumNames.empty)
     {
@@ -354,7 +362,13 @@ UIElement@ CreateResourceRefAttributeEditor(ListView@ list, Array<Serializable@>
 
     // Get the real attribute info from the serializable for the correct resource type
     AttributeInfo attrInfo = serializables[0].attributeInfos[index];
-    if (attrInfo.type == VAR_RESOURCEREF)
+    if (attrInfo.type == VAR_VARIANTMAP)
+    {
+        VariantMap map = serializables[0].attributes[index].GetVariantMap();
+        Array<StringHash>@ keys = map.keys;
+        resourceType = map[keys[subIndex]].GetResourceRef().type;
+    }
+    else if (attrInfo.type == VAR_RESOURCEREF)
         resourceType = serializables[0].attributes[index].GetResourceRef().type;
     else if (attrInfo.type == VAR_RESOURCEREFLIST)
         resourceType = serializables[0].attributes[index].GetResourceRefList().type;
@@ -362,7 +376,6 @@ UIElement@ CreateResourceRefAttributeEditor(ListView@ list, Array<Serializable@>
         resourceType = serializables[0].attributes[index].GetVariantVector()[subIndex].GetResourceRef().type;
 
     ResourcePicker@ picker = GetResourcePicker(resourceType);
-
     // Create the attribute name on a separate non-interactive line to allow for more space
     parent = CreateAttributeEditorParentWithSeparatedLabel(list, info.name, index, subIndex, suppressedSeparatedLabel);
 
@@ -437,7 +450,7 @@ UIElement@ CreateAttributeEditor(ListView@ list, Array<Serializable@>@ serializa
         parent = CreateBoolAttributeEditor(list, serializables, info, index, subIndex);
     else if ((type >= VAR_FLOAT && type <= VAR_VECTOR4) || type == VAR_QUATERNION || type == VAR_COLOR || type == VAR_INTVECTOR2 || type == VAR_INTVECTOR3 || type == VAR_INTRECT || type == VAR_DOUBLE || type == VAR_RECT)
         parent = CreateNumAttributeEditor(list, serializables, info, index, subIndex);
-    else if (type == VAR_INT)
+    else if (type == VAR_INT || type == VAR_INT64)
         parent = CreateIntAttributeEditor(list, serializables, info, index, subIndex);
     else if (type == VAR_RESOURCEREF)
         parent = CreateResourceRefAttributeEditor(list, serializables, info, index, subIndex, suppressedSeparatedLabel);
@@ -654,10 +667,14 @@ void LoadAttributeEditor(UIElement@ parent, const Variant&in value, const Attrib
         SetEditable(SetValue(parent.children[1], value.ToString(), sameValue), editable && sameValue);
     else if (type == VAR_BOOL)
         SetEditable(SetValue(parent.children[1], value.GetBool(), sameValue), editable && sameValue);
-    else if (type == VAR_INT)
+    else if (type == VAR_INT )
     {
         if (bitSelectionAttrs.Find(info.name) > -1)
             SetEditable(SetValue(parent.GetChild("LineEdit", true), value.ToString(), sameValue), editable && sameValue);
+        else if(LodEditorAttrName == info.name)
+        {
+
+        }
         else if (info.enumNames is null || info.enumNames.empty)
             SetEditable(SetValue(parent.children[1], value.ToString(), sameValue), editable && sameValue);
         else
@@ -837,7 +854,8 @@ void StoreAttributeEditor(UIElement@ parent, Array<Serializable@>@ serializables
     }
     else if (info.type == VAR_VARIANTMAP)
     {
-        StringHash key(parent.vars["Key"].GetUInt());
+       /*StringHash key(parent.vars["Key"].GetUInt());///以前的是错误的
+        
         for (uint i = 0; i < serializables.length; ++i)
         {
             VariantMap map = serializables[i].attributes[index].GetVariantMap();
@@ -846,7 +864,14 @@ void StoreAttributeEditor(UIElement@ parent, Array<Serializable@>@ serializables
             GetEditorValue(parent, map[key].type, null, coordinate, values);
             map[key] = values[0];
             serializables[i].attributes[index] = Variant(map);
-        }
+        }*/
+        VariantMap map = serializables[0].attributes[index].GetVariantMap();
+        Array<StringHash>@ keys = map.keys;
+        Variant[] values;
+        values.Push(map[keys[subIndex]]);  // Each individual variant may have multiple coordinates itself
+        GetEditorValue(parent, map[keys[subIndex]].type, null, coordinate, values);
+        map[keys[subIndex]] = values[0];
+        serializables[0].attributes[index] = Variant(map);
     }
     else
     {
@@ -1220,7 +1245,13 @@ void PickResource(StringHash eventType, VariantMap& eventData)
     AttributeInfo info = targets[0].attributeInfos[resourcePickIndex];
 
     StringHash resourceType;
-    if (info.type == VAR_RESOURCEREF)
+    if (info.type == VAR_VARIANTMAP)
+    {
+        VariantMap map = targets[0].attributes[resourcePickIndex].GetVariantMap();
+        Array<StringHash>@ keys = map.keys;
+        resourceType = map[keys[resourcePickSubIndex]].GetResourceRef().type;
+    }
+    else if (info.type == VAR_RESOURCEREF)
         resourceType = targets[0].attributes[resourcePickIndex].GetResourceRef().type;
     else if (info.type == VAR_RESOURCEREFLIST)
         resourceType = targets[0].attributes[resourcePickIndex].GetResourceRefList().type;
@@ -1302,6 +1333,17 @@ void PickResourceDone(StringHash eventType, VariantMap& eventData)
             ref.name = res.name;
             attrs[resourcePickSubIndex] = ref;
             target.attributes[resourcePickIndex] = Variant(attrs);
+            target.ApplyAttributes();
+        }
+        else if (info.type == VAR_VARIANTMAP)
+        {
+            VariantMap map = target.attributes[resourcePickIndex].GetVariantMap();
+            Array<StringHash>@ keys = map.keys;
+            ResourceRef ref = map[keys[resourcePickSubIndex]].GetResourceRef();
+            ref.type = res.type;
+            ref.name = res.name;
+            map[keys[resourcePickSubIndex]] = ref;
+            target.attributes[resourcePickIndex] = Variant(map);
             target.ApplyAttributes();
         }
     }
@@ -1556,4 +1598,14 @@ int GetAttributeIndex(Serializable@ serializable, const String&in attrName)
     }
 
     return -1;
+}
+
+void EditLodInfoAttribute(StringHash eventType, VariantMap& eventData)
+{
+    UIElement@ button  = eventData["Element"].GetPtr();
+    Array<Serializable@>@ serializables = GetAttributeEditorTargets(button);
+    if (!serializables.empty)
+    {
+        ShowLODInfoWindowEditor(serializables);
+    }
 }

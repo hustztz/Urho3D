@@ -16,6 +16,7 @@ void EditorSubscribeToEvents()
     SubscribeToEvent("PostRenderUpdate", "EditorMainHandlePostRenderUpdate");
 
     SubscribeToEvent("UIMouseClick", "EditorMainHandleUIMouseClick");
+//  SubscribeToEvent("UIMouseDoubleClick", "EditorMainHandleUIMouseDoubleClick");
     SubscribeToEvent("UIMouseClickEnd", "EditorMainHandleUIMouseClickEnd");
 
     SubscribeToEvent("BeginViewUpdate", "EditorMainHandleBeginViewUpdate");
@@ -111,6 +112,22 @@ void EditorMainHandleUIMouseClickEnd(StringHash eventType, VariantMap& eventData
 {
     // EditorView.as handler
     ViewMouseClickEnd();
+}
+
+void EditorMainHandleUIMouseDoubleClick(StringHash eventType, VariantMap& eventData)
+{
+    // EditorView.as handler
+    if(editMode == EDIT_SELECT)
+    {
+        ViewMouseClick();
+        if (lastSelectedNode.Get() !is null)
+        {
+            Array<Node@> nodes;
+            nodes.Push(lastSelectedNode.Get());
+            LocateNodes(nodes);
+        }
+        HandleOriginToggled(eventType, eventData);
+    }
 }
 
 void EditorMainHandleBeginViewUpdate(StringHash eventType, VariantMap& eventData)

@@ -40,6 +40,10 @@ XMLFile@ revertData;
 
 Vector3 lastOffsetForSmartDuplicate;
 
+Camera@ gcamera;
+Node@ gcameraLookAtNode;
+Node@ gcameraNode;
+
 void ClearSceneSelection()
 {
     selectedNodes.Clear();
@@ -90,8 +94,14 @@ bool ResetScene()
     editorScene.Clear();
     editorScene.CreateComponent("Octree");
     editorScene.CreateComponent("DebugRenderer");
-
+    editorScene.CreateComponent("DayNightWeatherControl");
+    /*
+    Skybox@ skybox  = editorScene.CreateComponent("Skybox");
+    skybox.model    = cache.GetResource("Model", "Models/Box.mdl");
+    skybox.material = cache.GetResource("Material", "Materials/DynamicSkybox.xml");
+*/
     // Release resources that became unused after the scene clear
+
     cache.ReleaseAllResources(false);
 
     sceneModified = false;
@@ -242,6 +252,13 @@ bool LoadScene(const String&in fileName)
     CreateGrid();
     SetActiveViewport(viewports[0]);
 
+    for(int i=0; i < viewports.length; ++i)
+    {      
+        if(viewports[i].viewport !is null)
+        {
+            viewports[i].viewport.UpdateStaticShadow();
+        }
+    }
     return loaded;
 }
 
@@ -383,7 +400,23 @@ Node@ LoadNode(const String&in fileName, Node@ parent = null, bool raycastToMous
     {
         FocusNode(newNode);
         instantiateFileName = fileName;
+
+        Array<Node@> nodes = newNode.GetChildren(true);
+        for(int i=0; i < nodes.length; ++i)
+        {
+            Array<Component@>@ comps = nodes[i].GetComponents();
+            for(int j=0; j < comps.length; ++j)
+            {
+                Drawable@ able = cast<Drawable@>(comps[j]);
+                if(able !is null)
+                {
+                    able.castShadows = true;
+                }
+            }
+        }
     }
+    
+
     return newNode;
 }
 
@@ -428,6 +461,13 @@ Node@ InstantiateNodeFromFile(File@ file, const Vector3& position, const Quatern
             UpdateHierarchyItem(newNode);
     }
 
+    for(int i=0; i < viewports.length; ++i)
+    {      
+        if(viewports[i].viewport !is null)
+        {
+            viewports[i].viewport.UpdateStaticShadow();
+        }
+    }
     return newNode;
 }
 
@@ -488,7 +528,7 @@ void UpdateScene(float timeStep)
 void StopSceneUpdate()
 {
     runUpdate = false;
-    audio.Stop();
+ //   audio.Stop();
     toolBarDirty = true;
 
     // If scene should revert on update stop, load saved data now
@@ -511,7 +551,7 @@ void StartSceneUpdate()
     runUpdate = true;
     // Run audio playback only when scene is updating, so that audio components' time-dependent attributes stay constant when
     // paused (similar to physics)
-    audio.Play();
+  //  audio.Play();
     toolBarDirty = true;
 
     // Save scene data for reverting if enabled
@@ -619,6 +659,14 @@ bool SceneDelete()
     SaveEditActionGroup(group);
 
     EndSelectionModify();
+    
+    for(int i=0; i < viewports.length; ++i)
+    {      
+        if(viewports[i].viewport !is null)
+        {
+            viewports[i].viewport.UpdateStaticShadow();
+        }
+    }
     return true;
 }
 

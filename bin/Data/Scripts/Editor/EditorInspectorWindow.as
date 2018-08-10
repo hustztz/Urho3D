@@ -21,6 +21,9 @@ const uint ATTRIBUTE_RES = 0;
 const uint VARIABLE_RES = 1;
 const uint STYLE_RES = 2;
 const uint TAGS_RES = 3;
+String AttrDisplayCompact = "AttrDisplayCompact";
+IntRect CompAttrCompactIcon(192,0,206,12);
+IntRect CompAttrUnCompactIcon(177,0,189,16);
 
 uint nodeContainerIndex = M_MAX_UNSIGNED;
 uint componentContainerStartIndex = 0;
@@ -62,6 +65,16 @@ UIElement@ GetNodeContainer()
     nodeContainerIndex = parentContainer.numChildren;
     parentContainer.LoadChildXML(xmlResources[ATTRIBUTE_RES], uiStyle);
     UIElement@ container = GetContainer(nodeContainerIndex);
+    UIElement@ removeBtn = container.GetChild("RemoveCompnentBtn", true);
+    if(removeBtn !is null)
+    {
+        removeBtn.visible = false;
+    }
+    @removeBtn = container.GetChild("compactbtn", true);
+    if(removeBtn !is null)
+    {
+        removeBtn.visible = false;
+    }
     container.LoadChildXML(xmlResources[VARIABLE_RES], uiStyle);
     SubscribeToEvent(container.GetChild("ResetToDefault", true), "Released", "HandleResetToDefault");
     SubscribeToEvent(container.GetChild("NewVarDropDown", true), "ItemSelected", "CreateNodeVariable");
@@ -91,6 +104,22 @@ UIElement@ GetComponentContainer(uint index)
         parentContainer.LoadChildXML(xmlResources[ATTRIBUTE_RES], uiStyle);
         container = GetContainer(i);
         SubscribeToEvent(container.GetChild("ResetToDefault", true), "Released", "HandleResetToDefault");
+
+        UIElement@ btn = container.GetChild("RemoveCompnentBtn", true);
+        if(btn !is null)
+        {
+            btn.visible = false;
+            SubscribeToEvent(btn, "Released", "HandleRemoveComponent");
+        }
+        @btn = container.GetChild("compactbtn", true);
+        if(btn !is null)
+        {
+            btn.vars[AttrDisplayCompact] = container;
+            container.vars[AttrDisplayCompact] = false;
+            BorderImage@ bimg = cast<BorderImage@>(btn);
+            bimg.imageRect = CompAttrCompactIcon;
+            SubscribeToEvent(btn, "Pressed", "HandleToggelComponent");
+        }
     }
     return container;
 }
@@ -120,6 +149,16 @@ UIElement@ GetUIElementContainer()
     SubscribeToEvent(tagEdit, "TextChanged", "HandleTagsEdit");
     UIElement@ tagSelect = parentContainer.GetChild("TagsSelect", true);
     SubscribeToEvent(tagSelect, "Released", "HandleTagsSelect");
+    UIElement@ btn = container.GetChild("RemoveCompnentBtn", true);
+    if(btn !is null)
+    {
+        btn.visible = false;
+    }
+    @btn = container.GetChild("compactbtn", true);
+    if(btn !is null)
+    {
+        btn.visible = false;
+    }
     return container;
 }
 
@@ -137,7 +176,7 @@ void CreateAttributeInspectorWindow()
     ui.root.AddChild(attributeInspectorWindow);
     int height = Min(ui.root.height - 60, 500);
     attributeInspectorWindow.SetSize(344, height);
-    attributeInspectorWindow.SetPosition(ui.root.width - 10 - attributeInspectorWindow.width, 100);
+    attributeInspectorWindow.SetPosition(ui.root.width - 10 - attributeInspectorWindow.width, 0);
     attributeInspectorWindow.opacity = uiMaxOpacity;
     attributeInspectorWindow.BringToFront();
     inspectorLockButton = attributeInspectorWindow.GetChild("LockButton", true);
@@ -205,9 +244,18 @@ void HandleWindowLayoutUpdated()
         ListView@ list = container.GetChild("AttributeList");
         if (list is null)
             continue;
-
+        if(!container.vars[AttrDisplayCompact].empty && container.vars[AttrDisplayCompact].GetBool())
+        {
+            container.maxHeight = 25;
+            list.visible = false;
+        }
+        else if(i > 0)
+        {
+            container.maxHeight = 100000;
+            list.visible = true;
+        }
+        
         int width = list.width;
-
         // Adjust the icon panel's width
         UIElement@ panel = container.GetChild("IconsPanel", true);
         if (panel !is null)
@@ -323,6 +371,8 @@ void UpdateAttributeInspector(bool fullUpdate = true)
 
             UpdateAttributes(components, container.GetChild("AttributeList"), fullUpdate);
             SetAttributeEditorID(container.GetChild("ResetToDefault", true), components);
+            SetAttributeEditorID(container.GetChild("RemoveCompnentBtn", true), components);            
+            AddRemoveComponentBtn(container, components[0]);
         }
     }
 
@@ -387,6 +437,19 @@ void UpdateAttributeInspector(bool fullUpdate = true)
     // Adjust size and position of manual-layout UI-elements, e.g. icons panel
     if (fullUpdate)
         HandleWindowLayoutUpdated();
+}
+
+void AddRemoveComponentBtn(UIElement@ container, Serializable@ comp)
+{
+    Octree@ tree = cast<Octree@>(comp);
+    if(tree is null )
+    {
+        UIElement@ removeBtn = container.GetChild("RemoveCompnentBtn", true);
+        if(removeBtn !is null)
+        {
+            removeBtn.visible = true;
+        }
+    }
 }
 
 /// Update the attribute list of the node container.
@@ -809,6 +872,69 @@ void HandleResetToDefault(StringHash eventType, VariantMap& eventData)
     attributesFullDirty = true;
 }
 
+void HandleRemoveComponent(StringHash eventType, VariantMap& eventData)
+{
+    ui.cursor.shape = CS_BUSY;
+
+    UIElement@ button = eventData["Element"].GetPtr();
+    Array<Serializable@>@ serializables = GetAttributeEditorTargets(button);
+    if (serializables.empty)
+        return;
+
+    // Group for storing undo actions
+    EditActionGroup group;
+
+    // Reset target serializables to their default values
+    for (uint i = 0; i < serializables.length && i < 1; ++i)
+    {
+        Serializable@ target = serializables[i];
+        Component@ comp = cast<Component@>(target);
+        if(comp !is null)
+        {
+            comp.Remove();
+        }
+    }
+
+    HandleHierarchyListSelectionChange();
+ // attributesFullDirty = true;
+}
+
+void HandleToggelComponent(StringHash eventType, VariantMap& eventData)
+{
+    ui.cursor.shape = CS_BUSY;
+
+    BorderImage@ button = eventData["Element"].GetPtr();
+    
+    UIElement@ container = button.vars[AttrDisplayCompact].GetPtr();
+
+    bool compact = container.vars[AttrDisplayCompact].GetBool();
+    container.vars[AttrDisplayCompact] = !compact;
+    
+    button.imageRect = compact ? CompAttrCompactIcon : CompAttrUnCompactIcon;
+
+    HandleWindowLayoutUpdated();
+    HandleWindowLayoutCompactUpdated();
+}
+
+void HandleWindowLayoutCompactUpdated()
+{
+    for (uint i = 0; i < parentContainer.numChildren; ++i)
+    {
+        UIElement@ container = GetContainer(i);
+        ListView@ list = container.GetChild("AttributeList");
+        if (list is null)
+            continue;
+        if(!container.vars[AttrDisplayCompact].empty && container.vars[AttrDisplayCompact].GetBool())
+        {
+
+        }
+        else if(i > 0)
+        {
+            list.visible = true;
+            list.height = container.height;
+        }
+    }
+}
 /// Handle create new user-defined variable event for node target.
 void CreateNodeVariable(StringHash eventType, VariantMap& eventData)
 {
@@ -953,6 +1079,8 @@ Variant ExtractVariantType(VariantMap& eventData)
         return Variant(Vector3());
     case 5:
         return Variant(Color());
+    case 6:
+        return int64(0);
     }
 
     return Variant();   // This should not happen

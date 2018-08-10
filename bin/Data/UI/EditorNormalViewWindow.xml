@@ -1,0 +1,182 @@
+<?xml version="1.0"?>
+<element type="Window">
+	<attribute name="Name" value="NormalViewWindow" />
+	<attribute name="Position" value="597 193" />
+	<attribute name="Size" value="648 585" />
+	<attribute name="Pivot" value="0 0" />
+	<attribute name="Focus Mode" value="ResetFocus" />
+	<attribute name="Layout Mode" value="Vertical" />
+	<attribute name="Layout Spacing" value="4" />
+	<attribute name="Layout Border" value="6 6 6 6" />
+	<attribute name="Image Rect" value="48 0 64 16" />
+	<attribute name="Border" value="4 4 4 4" />
+	<attribute name="Resize Border" value="6 6 6 6" />
+	<attribute name="Is Movable" value="true" />
+	<attribute name="Is Resizable" value="true" />
+	<element>
+		<attribute name="Min Size" value="0 20" />
+		<attribute name="Max Size" value="2147483647 20" />
+		<attribute name="Pivot" value="0 0" />
+		<attribute name="Layout Mode" value="Horizontal" />
+		<element type="Text">
+			<attribute name="Pivot" value="0 0" />
+			<attribute name="Top Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Top Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Font Size" value="18" />
+			<attribute name="Text" value="法线查看器" />
+			<attribute name="Auto Localizable" value="true" />
+		</element>
+		<element type="Button" style="CloseButton">
+			<attribute name="Name" value="closebtn" />
+			<attribute name="Min Size" value="16 16" />
+			<attribute name="Max Size" value="16 16" />
+			<attribute name="Pivot" value="0 0" />
+			<attribute name="Focus Mode" value="NotFocusable" />
+			<attribute name="Image Rect" value="144 0 160 16" />
+			<attribute name="Border" value="4 4 4 4" />
+			<attribute name="Hover Image Offset" value="0 16" />
+			<attribute name="Pressed Image Offset" value="16 0" />
+			<attribute name="Pressed Child Offset" value="-1 1" />
+		</element>
+	</element>
+	<element type="BorderImage" style="EditorDivider">
+		<attribute name="Min Size" value="0 11" />
+		<attribute name="Max Size" value="2147483647 11" />
+		<attribute name="Pivot" value="0 0" />
+		<attribute name="Image Rect" value="144 32 160 43" />
+		<attribute name="Border" value="4 4 4 4" />
+	</element>
+	<element>
+		<attribute name="Name" value="functionbar" />
+		<attribute name="Min Size" value="400 20" />
+		<attribute name="Max Size" value="2147483647 20" />
+		<attribute name="Pivot" value="0 0" />
+		<element type="Button">
+			<attribute name="Name" value="resetcamerabtn" />
+			<attribute name="Position" value="0 -3" />
+			<attribute name="Size" value="80 25" />
+			<attribute name="Min Size" value="80 25" />
+			<attribute name="Max Size" value="80 25" />
+			<attribute name="Pivot" value="0 0" />
+			<attribute name="Image Rect" value="16 0 32 16" />
+			<attribute name="Border" value="4 4 4 4" />
+			<attribute name="Hover Image Offset" value="0 16" />
+			<attribute name="Pressed Image Offset" value="16 0" />
+			<attribute name="Pressed Child Offset" value="-1 1" />
+			<element type="Text">
+				<attribute name="Min Anchor" value="0.5 0.5" />
+				<attribute name="Max Anchor" value="0.5 0.5" />
+				<attribute name="Pivot" value="0.5 0.5" />
+				<attribute name="Top Left Color" value="0.85 0.85 0.85 1" />
+				<attribute name="Top Right Color" value="0.85 0.85 0.85 1" />
+				<attribute name="Bottom Left Color" value="0.85 0.85 0.85 1" />
+				<attribute name="Bottom Right Color" value="0.85 0.85 0.85 1" />
+				<attribute name="Text" value="重置摄像机" />
+			</element>
+		</element>
+		<element type="Button">
+			<attribute name="Name" value="toggellookatbtn" />
+			<attribute name="Position" value="90 -3" />
+			<attribute name="Size" value="80 25" />
+			<attribute name="Min Size" value="80 25" />
+			<attribute name="Max Size" value="80 25" />
+			<attribute name="Pivot" value="0 0" />
+			<attribute name="Image Rect" value="16 0 32 16" />
+			<attribute name="Border" value="4 4 4 4" />
+			<attribute name="Hover Image Offset" value="0 16" />
+			<attribute name="Pressed Image Offset" value="16 0" />
+			<attribute name="Pressed Child Offset" value="-1 1" />
+			<element type="Text">
+				<attribute name="Min Anchor" value="0.5 0.5" />
+				<attribute name="Max Anchor" value="0.5 0.5" />
+				<attribute name="Pivot" value="0.5 0.5" />
+				<attribute name="Top Left Color" value="0.85 0.85 0.85 1" />
+				<attribute name="Top Right Color" value="0.85 0.85 0.85 1" />
+				<attribute name="Bottom Left Color" value="0.85 0.85 0.85 1" />
+				<attribute name="Bottom Right Color" value="0.85 0.85 0.85 1" />
+				<attribute name="Text" value="旋转轴心" />
+			</element>
+		</element>
+	</element>
+	<element type="BorderImage" style="EditorDivider">
+		<attribute name="Min Size" value="0 11" />
+		<attribute name="Max Size" value="2147483647 11" />
+		<attribute name="Pivot" value="0 0" />
+		<attribute name="Image Rect" value="144 32 160 43" />
+		<attribute name="Border" value="4 4 4 4" />
+	</element>
+	<element>
+		<attribute name="Min Size" value="0 20" />
+		<attribute name="Max Size" value="2147483647 20" />
+		<attribute name="Pivot" value="0 0" />
+		<attribute name="Layout Mode" value="Horizontal" />
+		<element type="Text">
+			<attribute name="Min Size" value="40 20" />
+			<attribute name="Max Size" value="40 20" />
+			<attribute name="Pivot" value="0 0" />
+			<attribute name="Top Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Top Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Font Size" value="13" />
+			<attribute name="Text" value="模型" />
+			<attribute name="Auto Localizable" value="true" />
+		</element>
+		<element type="LineEdit">
+			<attribute name="Name" value="modelpath" />
+			<attribute name="Pivot" value="0 0" />
+			<attribute name="Image Rect" value="64 0 80 16" />
+			<attribute name="Border" value="4 4 4 4" />
+			<attribute name="Hover Image Offset" value="0 16" />
+			<element type="Text" internal="true" style="none">
+				<attribute name="Min Anchor" value="0 0.5" />
+				<attribute name="Max Anchor" value="0 0.5" />
+				<attribute name="Pivot" value="0 0.5" />
+				<attribute name="Color" value="0.9 1 0.9 1" />
+				<attribute name="Top Left Color" value="0.9 1 0.9 1" />
+				<attribute name="Top Right Color" value="0.9 1 0.9 1" />
+				<attribute name="Bottom Left Color" value="0.9 1 0.9 1" />
+				<attribute name="Bottom Right Color" value="0.9 1 0.9 1" />
+				<attribute name="Selection Color" value="0.3 0.4 0.32 1" />
+			</element>
+			<element type="BorderImage" internal="true" style="none">
+				<attribute name="Size" value="4 17" />
+				<attribute name="Min Anchor" value="0 0.5" />
+				<attribute name="Max Anchor" value="0 0.5" />
+				<attribute name="Pivot" value="0 0.5" />
+				<attribute name="Image Rect" value="12 0 16 16" />
+			</element>
+		</element>
+		<element type="Button">
+			<attribute name="Name" value="selectmodel" />
+			<attribute name="Min Size" value="60 20" />
+			<attribute name="Max Size" value="60 20" />
+			<attribute name="Pivot" value="0 0" />
+			<attribute name="Image Rect" value="16 0 32 16" />
+			<attribute name="Border" value="4 4 4 4" />
+			<attribute name="Hover Image Offset" value="0 16" />
+			<attribute name="Pressed Image Offset" value="16 0" />
+			<attribute name="Pressed Child Offset" value="-1 1" />
+			<element type="Text">
+				<attribute name="Min Anchor" value="0.5 0.5" />
+				<attribute name="Max Anchor" value="0.5 0.5" />
+				<attribute name="Pivot" value="0.5 0.5" />
+				<attribute name="Color" value="1 1 1 1" />
+				<attribute name="Text" value="选择" />
+			</element>
+		</element>
+	</element>
+	<element type="View3D" style="View3D">
+		<attribute name="Name" value="normalpreview" />
+		<attribute name="Min Size" value="400 464" />
+		<attribute name="Max Size" value="2147483647 464" />
+		<attribute name="Pivot" value="0 0" />
+		<attribute name="Use Derived Opacity" value="false" />
+		<attribute name="Image Rect" value="0 0 636 464" />
+		<attribute name="Resize Border" value="0 6 0 6" />
+		<attribute name="Is Resizable" value="true" />
+		<attribute name="Fixed Height Resizing" value="true" />
+	</element>
+</element>

@@ -3,6 +3,7 @@ UIElement@ secondaryToolBar;
 void CreateSecondaryToolBar()
 {
     secondaryToolBar = BorderImage("secondaryToolBar");
+    secondaryToolBar.visible = !hideSecondaryToolBar;
     ui.root.AddChild(secondaryToolBar);
 
     secondaryToolBar.style = "EditorToolBar";
@@ -10,7 +11,7 @@ void CreateSecondaryToolBar()
     secondaryToolBar.layoutSpacing = 4;
     secondaryToolBar.layoutBorder = IntRect(4, 4, 4, 4);
     secondaryToolBar.opacity = uiMaxOpacity;
-    secondaryToolBar.SetFixedSize(28, graphics.height);
+    secondaryToolBar.SetFixedSize(hideSecondaryToolBar ? 0 : 28, graphics.height);
     secondaryToolBar.SetPosition(0, uiMenuBar.height+40);
     secondaryToolBar.SetFixedHeight(graphics.height);
 

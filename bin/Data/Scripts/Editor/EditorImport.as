@@ -30,7 +30,7 @@ int ExecuteAssetImporter(Array<String>@ args)
         if (!fileSystem.FileExists(assetImporterPath))
             assetImporterPath = fileSystem.programDir + "AssetImporter" + exeSuffix;
     }
-
+    args.Push("pause");
     return fileSystem.SystemRun(assetImporterPath, args);
 }
 

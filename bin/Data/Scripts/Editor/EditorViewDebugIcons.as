@@ -69,6 +69,7 @@ const int debugIconsPlacementIndent = 1.0;
 const float debugIconsOrthoDistance = 15.0;
 const float debugIconAlphaThreshold = 0.1;
 const float maxDistance = 50.0;
+bool  gShowDebugIcons = true;
 
 void CreateDebugIcons(Node@ tempNode)
 {
@@ -87,15 +88,25 @@ void CreateDebugIcons(Node@ tempNode)
 
 void UpdateViewDebugIcons()
 {
-    if (editorScene is null || timeToNextDebugIconsUpdate > time.systemTime) return;
+    if (editorScene is null || timeToNextDebugIconsUpdate > time.systemTime ) return;
 
     debugIconsNode = editorScene.GetChild("DebugIconsContainer", true);
-
+    
     if (debugIconsNode is null) 
     {
         debugIconsNode = editorScene.CreateChild("DebugIconsContainer", LOCAL);
         debugIconsNode.temporary = true;
     }
+    if(gShowDebugIcons)
+    {
+        debugIconsNode.enabled = true;
+    }
+    else
+    {
+        debugIconsNode.enabled = false;
+        return;
+    }
+
     // Checkout if debugIconsNode do not have any BBS component, add all at once
     BillboardSet@ isBSExist = debugIconsNode.GetComponent("BillboardSet");
     if (isBSExist is null)
@@ -136,6 +147,8 @@ void UpdateViewDebugIcons()
                 // Fill with new data
                 for (uint i = 0; i < nodes.length; ++i)
                 {
+                    if(nodes[i] is gcameraNode) continue;
+
                     Component@ component = nodes[i].GetComponent(componentTypes[iconType]);
                     if (component is null) continue;
 
@@ -148,7 +161,7 @@ void UpdateViewDebugIcons()
 
                     if (iconType == ICON_SPLINE_PATH)
                     {
-                        SplinePath@ sp = cast<SplinePath>(component);
+                        /*SplinePath@ sp = cast<SplinePath>(component);
                         if (sp !is null)
                         {
                             if (sp.length > 0.01f)
@@ -187,7 +200,7 @@ void UpdateViewDebugIcons()
                                         bb.enabled = false;
                                 }
                             }
-                        }
+                        }*/
                     }
                     else
                     {

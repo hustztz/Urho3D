@@ -4130,78 +4130,6 @@ Vector4 tangent;
 Vector2 texCoord;
 };
 
-class Database
-{
-public:
-// Methods:
-DbConnection Connect(const String&);
-void Disconnect(DbConnection);
-bool HasSubscribedToEvent(Object, const String&);
-bool HasSubscribedToEvent(const String&);
-void SendEvent(const String&, VariantMap& = VariantMap ( ));
-
-// Properties:
-/* readonly */
-String category;
-uint poolSize;
-/* readonly */
-bool pooling;
-/* readonly */
-int refs;
-/* readonly */
-StringHash type;
-/* readonly */
-String typeName;
-/* readonly */
-int weakRefs;
-};
-
-class DbConnection
-{
-public:
-// Methods:
-DbResult Execute(const String&, bool = false);
-bool HasSubscribedToEvent(Object, const String&);
-bool HasSubscribedToEvent(const String&);
-void SendEvent(const String&, VariantMap& = VariantMap ( ));
-
-// Properties:
-/* readonly */
-String category;
-/* readonly */
-bool connected;
-/* readonly */
-String connectionString;
-/* readonly */
-int refs;
-/* readonly */
-StringHash type;
-/* readonly */
-String typeName;
-/* readonly */
-int weakRefs;
-};
-
-class DbResult
-{
-public:
-~DbResult();
-DbResult();
-DbResult(const DbResult&in);
-
-// Properties:
-/* readonly */
-Array<String> columns;
-/* readonly */
-int64 numAffectedRows;
-/* readonly */
-uint numColumns;
-/* readonly */
-uint numRows;
-/* readonly */
-Array<Array<Variant>> row;
-};
-
 class DebugHud
 {
 public:
@@ -16088,12 +16016,6 @@ CS_BUSY,
 CS_BUSY_ARROW,
 };
 
-enum DBAPI
-{
-DBAPI_SQLITE,
-DBAPI_ODBC,
-};
-
 enum DumpMode
 {
 DOXYGEN,
@@ -16719,11 +16641,9 @@ IntVector3 VectorRoundToInt(const Vector3&);
 bool WriteDrawablesToOBJ(Array<Drawable>, File, bool, bool, bool = false);
 
 // Global properties
-DBAPI DBAPI;
 Audio audio;
 ResourceCache cache;
 Console console;
-Database database;
 DebugHud debugHud;
 DebugRenderer debugRenderer;
 Engine engine;

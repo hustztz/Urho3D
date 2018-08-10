@@ -113,9 +113,16 @@ void ShowGizmo()
 
 void UpdateGizmo()
 {
-    UseGizmo();
-    PositionGizmo();
-    ResizeGizmo();
+    if(gShowDebugIcons)
+    {
+        UseGizmo();
+        PositionGizmo();
+        ResizeGizmo();
+    }
+    else
+    {
+        HideGizmo();
+    }
 }
 
 void PositionGizmo()

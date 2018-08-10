@@ -18,13 +18,14 @@ const StringHash NODE_ID_VAR("NodeID");
 const StringHash COMPONENT_ID_VAR("ComponentID");
 const StringHash UI_ELEMENT_ID_VAR("UIElementID");
 const StringHash DRAGDROPCONTENT_VAR("DragDropContent");
+const StringHash AGPOINTCLOUDCONTAINER_TYPE("AgPointCloudContainer");
 const StringHash[] ID_VARS = { StringHash(""), NODE_ID_VAR, COMPONENT_ID_VAR, UI_ELEMENT_ID_VAR };
 Color nodeTextColor(1.0f, 1.0f, 1.0f);
 Color componentTextColor(0.7f, 1.0f, 0.7f);
 
 Window@ hierarchyWindow;
 ListView@ hierarchyList;
-bool showID = true;
+bool showID = false;
 
 // UIElement does not have unique ID, so use a running number to generate a new ID each time an item is inserted into hierarchy list
 const uint UI_ELEMENT_BASE_ID = 1;
@@ -62,7 +63,7 @@ void CreateHierarchyWindow()
     ui.root.AddChild(hierarchyWindow);
     int height = Min(ui.root.height - 60, 500);
     hierarchyWindow.SetSize(300, height);
-    hierarchyWindow.SetPosition(35, 100);
+    hierarchyWindow.SetPosition(35, 0);
     hierarchyWindow.opacity = uiMaxOpacity;
     hierarchyWindow.BringToFront();
 
@@ -297,6 +298,8 @@ void UpdateHierarchyItemText(uint itemIndex, bool iconEnabled, const String&in t
 
 void AddComponentItem(uint compItemIndex, Component@ component, UIElement@ parentItem)
 {
+    if(hideComponent) return;
+
     Text@ text = Text();
     hierarchyList.InsertItem(compItemIndex, text, parentItem);
     text.style = "FileSelectorListText";
@@ -769,6 +772,8 @@ void HandleHierarchyListSelectionChange()
         for (uint j = 0; j < selectedNodes[0].numComponents; ++j)
         {
             StringHash compType = selectedNodes[0].components[j].type;
+            if (compType == AGPOINTCLOUDCONTAINER_TYPE ) continue;
+            
             bool sameType = true;
             for (uint i = 1; i < selectedNodes.length; ++i)
             {
@@ -783,7 +788,9 @@ void HandleHierarchyListSelectionChange()
             {
                 ++count;
                 for (uint i = 0; i < selectedNodes.length; ++i)
+                {
                     editComponents.Push(selectedNodes[i].components[j]);
+                }
             }
         }
         if (count > 1)
@@ -803,10 +810,14 @@ void HandleHierarchyListSelectionChange()
     }
 
     if (selectedUIElements.empty && editUIElement !is null)
+    { 
         editUIElements.Push(editUIElement);
+    }
     else
+    {
         editUIElements = selectedUIElements;
-
+    }
+    DrawSelectEffect();
     PositionGizmo();
     UpdateAttributeInspector();
     UpdateCameraPreview();
@@ -880,8 +891,9 @@ void HandleHierarchyItemClick(StringHash eventType, VariantMap& eventData)
     }
     else if (type == ITEM_NODE)
     {
-        actions.Push(CreateContextMenuItem("Create Replicated Node", "HandleHierarchyContextCreateReplicatedNode"));
-        actions.Push(CreateContextMenuItem("Create Local Node", "HandleHierarchyContextCreateLocalNode"));
+//        actions.Push(CreateContextMenuItem("Create Replicated Node", "HandleHierarchyContextCreateReplicatedNode"));
+//        actions.Push(CreateContextMenuItem("Create Local Node", "HandleHierarchyContextCreateLocalNode"));
+        actions.Push(CreateContextMenuItem("Create Local Node", "HandleHierarchyContextCreateReplicatedNode"));
         actions.Push(CreateContextMenuItem("Duplicate", "HandleHierarchyContextDuplicate"));
         actions.Push(CreateContextMenuItem("Copy", "HandleHierarchyContextCopy"));
         actions.Push(CreateContextMenuItem("Cut", "HandleHierarchyContextCut"));
@@ -893,6 +905,7 @@ void HandleHierarchyItemClick(StringHash eventType, VariantMap& eventData)
         actions.Push(CreateContextMenuItem("Reset scale", "HandleHierarchyContextResetScale"));
         actions.Push(CreateContextMenuItem("Enable/disable", "HandleHierarchyContextEnableDisable"));
         actions.Push(CreateContextMenuItem("Unparent", "HandleHierarchyContextUnparent"));
+        actions.Push(CreateContextMenuItem("ShowNormalView", "HandleHierarchyShowEditorNormalViewWindow"));
     }
     else if (type == ITEM_UI_ELEMENT)
     {
@@ -1429,7 +1442,7 @@ void HandleNodeRemoved(StringHash eventType, VariantMap& eventData)
 
 void HandleComponentAdded(StringHash eventType, VariantMap& eventData)
 {
-    if (suppressSceneChanges)
+    if (suppressSceneChanges || hideComponent)
         return;
 
     // Insert the newly added component at last component position but before the first child node position of the parent node
@@ -1896,6 +1909,11 @@ void HandleHierarchyContextEnableDisable()
 void HandleHierarchyContextUnparent()
 {
     SceneUnparent();
+}
+
+void HandleHierarchyShowEditorNormalViewWindow()
+{
+    ShowEditorNormalViewWindow(true);
 }
 
 void HandleHierarchyContextUIElementCloseUILayout()

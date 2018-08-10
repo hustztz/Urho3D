@@ -1,5 +1,5 @@
 // Urho3D editor
-
+#include "Scripts/Editor/EditorConfig.as"
 #include "Scripts/Editor/EditorHierarchyWindow.as"
 #include "Scripts/Editor/EditorView.as"
 #include "Scripts/Editor/EditorScene.as"
@@ -25,18 +25,24 @@
 #include "Scripts/Editor/EditorViewDebugIcons.as"
 #include "Scripts/Editor/EditorViewSelectableOrigins.as"
 #include "Scripts/Editor/EditorViewPaintSelection.as"
+#include "Scripts/Editor/EditorSwitchAssetWindow.as"
+#include "Scripts/Editor/EditorLodInfoWindow.as"
+#include "Scripts/Editor/EditorNormalViewWindow.as"
+#include "Scripts/Editor/EditorSelectEffect.as"
+#include "Scripts/Editor/EditorSelectEffectWindow.as"
 
 String configFileName;
 
+bool isDeleteCache = false;
 void Start()
 {
     // Assign the value ASAP because configFileName is needed on exit, including exit on error
-    configFileName = fileSystem.GetAppPreferencesDir("urho3d", "Editor") + "Config.xml";
+    configFileName = fileSystem.GetAppPreferencesDir("VKing", "Editor") + "Config.xml";
     localization.LoadJSONFile("EditorStrings.json");
-
+    localization.SetLanguage(4);
     if (engine.headless)
     {
-        ErrorDialog("Urho3D Editor", "Headless mode is not supported. The program will now exit.");
+        ErrorDialog("VKing Editor", "Headless mode is not supported. The program will now exit.");
         engine.Exit();
         return;
     }
@@ -54,7 +60,7 @@ void Start()
     // Enable console commands from the editor script
     script.defaultScriptFile = scriptFile;
     // Enable automatic resource reloading
-    cache.autoReloadResources = true;
+    //cache.autoReloadResources = true;
     // Return resources which exist but failed to load due to error, so that we will not lose resource refs
     cache.returnFailedResources = true;
     // Use OS mouse without grabbing it
@@ -91,6 +97,7 @@ void FirstFrame()
     SubscribeToEvent("ReloadFinished", "HandleReloadFinishOrFail");
     SubscribeToEvent("ReloadFailed", "HandleReloadFinishOrFail");
     EditorSubscribeToEvents();
+    ResizeUI();
 }
 
 void Stop()
@@ -334,10 +341,31 @@ void LoadConfig()
     {
         if (defaultTagsElem.HasAttribute("tags")) defaultTags = defaultTagsElem.GetAttribute("tags");
     }
+
+    RegisterGlobalVarNames();
+}
+
+void RegisterGlobalVarNames()
+{
+    //点云的数据
+    globalVarNames["scannerOrigin"]  = "scannerOrigin";
+    globalVarNames["TotalPoints"]    = "TotalPoints";
+    globalVarNames["HasRGB"]         = "HasRGB";
+    globalVarNames["HasNormals"]     = "HasNormals";
+    globalVarNames["HasIntensity"]   = "HasIntensity";
+    globalVarNames["IsLidarData"]    = "IsLidarData";
+    
+    globalVarNames["Material"]       = "Material";
+    globalVarNames["PointSize"]      = "PointSize";
+    globalVarNames["svoBoundsMin"]   = "svoBoundsMin";
+    globalVarNames["svoBoundsMax"]   = "svoBoundsMax";
+    globalVarNames["scanBoundsMin"]  = "scanBoundsMin";
+    globalVarNames["scanBoundsMax"]  = "scanBoundsMax";
 }
 
 void SaveConfig()
 {
+    if (isDeleteCache) return;
     XMLFile config;
     XMLElement configElem = config.CreateRoot("configuration");
     XMLElement cameraElem = configElem.CreateChild("camera");
@@ -439,6 +467,16 @@ void SaveConfig()
     SaveSoundTypes(soundTypesElem);
 
     config.Save(File(configFileName, FILE_WRITE));
+}
+
+bool DeleteConfigCache()
+{
+    if (fileSystem.FileExists(configFileName))
+    {
+        isDeleteCache = true;
+        return fileSystem.Delete(configFileName);
+    }
+    return false;
 }
 
 void MakeBackup(const String&in fileName)

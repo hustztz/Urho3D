@@ -313,6 +313,7 @@ static void RegisterRenderPath(asIScriptEngine* engine)
     engine->RegisterEnumValue("TextureUnit", "TU_LIGHTRAMP", TU_LIGHTRAMP);
     engine->RegisterEnumValue("TextureUnit", "TU_LIGHTSHAPE", TU_LIGHTSHAPE);
     engine->RegisterEnumValue("TextureUnit", "TU_SHADOWMAP", TU_SHADOWMAP);
+	engine->RegisterEnumValue("TextureUnit", "TU_STATICSHADOWMAP", TU_STATICSHADOWMAP);
 #ifdef DESKTOP_GRAPHICS
     engine->RegisterEnumValue("TextureUnit", "TU_CUSTOM1", TU_CUSTOM1);
     engine->RegisterEnumValue("TextureUnit", "TU_CUSTOM2", TU_CUSTOM2);
@@ -470,6 +471,9 @@ static void RegisterTextures(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Viewport", "Ray GetScreenRay(int, int) const", asMETHOD(Viewport, GetScreenRay), asCALL_THISCALL);
     engine->RegisterObjectMethod("Viewport", "IntVector2 WorldToScreenPoint(const Vector3&in) const", asMETHOD(Viewport, WorldToScreenPoint), asCALL_THISCALL);
     engine->RegisterObjectMethod("Viewport", "Vector3 ScreenToWorldPoint(int, int, float) const", asMETHOD(Viewport, ScreenToWorldPoint), asCALL_THISCALL);
+	engine->RegisterObjectMethod("Viewport", "void EnableStaticShadow(bool)", asMETHOD(Viewport, EnableStaticShadow), asCALL_THISCALL); 
+	engine->RegisterObjectMethod("Viewport", "void UpdateStaticShadow()", asMETHOD(Viewport, UpdateStaticShadow), asCALL_THISCALL);
+	
 
     engine->RegisterObjectType("RenderSurface", 0, asOBJ_REF);
     engine->RegisterObjectBehaviour("RenderSurface", asBEHAVE_ADDREF, "void f()", asMETHOD(RenderSurface, AddRef), asCALL_THISCALL);
@@ -2041,6 +2045,8 @@ static void RegisterRenderer(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Renderer", "uint get_numLights(bool) const", asMETHOD(Renderer, GetNumLights), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "uint get_numShadowMaps(bool) const", asMETHOD(Renderer, GetNumShadowMaps), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "uint get_numOccluders(bool) const", asMETHOD(Renderer, GetNumOccluders), asCALL_THISCALL);
+	engine->RegisterObjectMethod("Renderer", "void set_ableLogDepth(bool)", asMETHOD(Renderer, EnableLogDepth), asCALL_THISCALL);
+	
     engine->RegisterGlobalFunction("Renderer@+ get_renderer()", asFUNCTION(GetRenderer), asCALL_CDECL);
 }
 

@@ -59,8 +59,8 @@ Array<String> uiRecentScenes;
 String screenshotDir = fileSystem.programDir + "Screenshots";
 
 bool uiFaded = false;
-float uiMinOpacity = 0.3;
-float uiMaxOpacity = 0.7;
+float uiMinOpacity = 1.0;
+float uiMaxOpacity = 1.0;
 bool uiHidden = false;
 
 TerrainEditor terrainEditor;
@@ -99,8 +99,10 @@ void CreateUI()
     CreateLayerEditor();
     CreateColorWheel();
 
+    CreateSwitchAssetWindowEditor();
 	terrainEditor.Create();
-
+    terrainEditor.Hide();
+    attributeInspectorWindow.BringToFront();
     SubscribeToEvent("ScreenMode", "ResizeUI");
     SubscribeToEvent("MenuSelected", "HandleMenuSelected");
     SubscribeToEvent("ChangeLanguage", "HandleChangeLanguage");
@@ -116,7 +118,7 @@ void ResizeUI()
     uiMenuBar.SetFixedWidth(graphics.width);
 
     // Resize tool bar
-    toolBar.SetFixedWidth(graphics.width);
+    toolBar.SetFixedWidth(Max(ui.root.width - attributeInspectorWindow.width - hierarchyWindow.width , 0));
 
     // Resize secondary tool bar
     secondaryToolBar.SetFixedHeight(graphics.height);
@@ -333,23 +335,26 @@ void CreateMenuBar()
         mruScenesPopup = CreatePopup(recentSceneMenu);
         PopulateMruScenes();
         CreateChildDivider(popup);
-
+/*
         Menu@ childMenu = CreateMenuItem("menu Load node", null, SHOW_POPUP_INDICATOR);
         Window@ childPopup = CreatePopup(childMenu);
         childPopup.AddChild(CreateMenuItem("As replicated...", @PickFile, 0, 0, true, "Load node as replicated..."));
         childPopup.AddChild(CreateMenuItem("As local...", @PickFile, 0, 0, true, "Load node as local..."));
         popup.AddChild(childMenu);
-
+*/
+    
+        popup.AddChild(CreateMenuItem("menu Load node", @PickFile));
         popup.AddChild(CreateMenuItem("Save node as...", @PickFile));
         CreateChildDivider(popup);
-        popup.AddChild(CreateMenuItem("Import model...", @PickFile));
-        popup.AddChild(CreateMenuItem("Import scene...", @PickFile));
-        popup.AddChild(CreateMenuItem("Import animation...", @PickFile));
+        popup.AddChild(CreateMenuItem("Switch Asset...", @PickFile));
+      //  popup.AddChild(CreateMenuItem("Import model...", @PickFile));
+     //   popup.AddChild(CreateMenuItem("Import scene...", @PickFile));
+     //   popup.AddChild(CreateMenuItem("Import animation...", @PickFile));
         CreateChildDivider(popup);
         popup.AddChild(CreateMenuItem("Export scene to OBJ...", @PickFile));
         popup.AddChild(CreateMenuItem("Export selected to OBJ...", @PickFile));
         CreateChildDivider(popup);
-        popup.AddChild(CreateMenuItem("Run script...", @PickFile));
+     //   popup.AddChild(CreateMenuItem("Run script...", @PickFile));
         popup.AddChild(CreateMenuItem("Set resource path...", @PickFile));
         CreateChildDivider(popup);
         popup.AddChild(CreateMenuItem("Exit", @Exit));
@@ -453,6 +458,7 @@ void CreateMenuBar()
         childPopup.AddChild(CreateMenuItem("Non-cyclic", @SetSplinePath, 0, 0, true, "Set non-cyclic spline path"));
         childPopup.AddChild(CreateMenuItem("Cyclic", @SetSplinePath, 0, 0, true, "Set cyclic spline path"));
         popup.AddChild(childMenu);
+        popup.AddChild(CreateMenuItem("delete cache", @DeleteConfigCache));
         FinalizedPopupMenu(popup);
         uiMenuBar.AddChild(menu);
     }
@@ -460,9 +466,12 @@ void CreateMenuBar()
     {
         Menu@ menu = CreateMenu("Create");
         Window@ popup = menu.popup;
+        popup.AddChild(CreateMenuItem("As node...", @PickNode, 0, 0, true, "Create Replicated node"));
+        /*
         popup.AddChild(CreateMenuItem("Replicated node", @PickNode, 0, 0, true, "Create Replicated node"));
         popup.AddChild(CreateMenuItem("Local node", @PickNode, 0, 0, true, "Create Local node"));
         CreateChildDivider(popup);
+        */
 
         Menu@ childMenu = CreateMenuItem("Component", null, SHOW_POPUP_INDICATOR);
         Window@ childPopup = CreatePopup(childMenu);
@@ -489,24 +498,28 @@ void CreateMenuBar()
         for (uint i = 0; i < objects.length; ++i)
             childPopup.AddChild(CreateIconizedMenuItem(objects[i], @PickBuiltinObject, 0, 0, "Node", true, "Create " + objects[i]));
         popup.AddChild(childMenu);
-        CreateChildDivider(popup);
-
-        childMenu = CreateMenuItem("UI-element", null, SHOW_POPUP_INDICATOR);
-        childPopup = CreatePopup(childMenu);
-        String[] uiElementTypes = GetObjectsByCategory("UI");
-        for (uint i = 0; i < uiElementTypes.length; ++i)
+        
+        if(!hideUIEditor)
         {
-            if (uiElementTypes[i] != "UIElement")
-                childPopup.AddChild(CreateIconizedMenuItem(uiElementTypes[i], @PickUIElement, 0, 0, "", true, "Create " + uiElementTypes[i]));
+            CreateChildDivider(popup);
+            childMenu = CreateMenuItem("UI-element", null, SHOW_POPUP_INDICATOR);
+            childPopup = CreatePopup(childMenu);
+            String[] uiElementTypes = GetObjectsByCategory("UI");
+            for (uint i = 0; i < uiElementTypes.length; ++i)
+            {
+                if (uiElementTypes[i] != "UIElement")
+                    childPopup.AddChild(CreateIconizedMenuItem(uiElementTypes[i], @PickUIElement, 0, 0, "", true, "Create " + uiElementTypes[i]));
+            }
+            CreateChildDivider(childPopup);
+            childPopup.AddChild(CreateIconizedMenuItem("UIElement", @PickUIElement));
+            popup.AddChild(childMenu);
         }
-        CreateChildDivider(childPopup);
-        childPopup.AddChild(CreateIconizedMenuItem("UIElement", @PickUIElement));
-        popup.AddChild(childMenu);
 
         FinalizedPopupMenu(popup);
         uiMenuBar.AddChild(menu);
     }
-
+    
+    if(!hideUIEditor)
     {
         Menu@ menu = CreateMenu("UI-layout");
         Window@ popup = menu.popup;
@@ -528,18 +541,31 @@ void CreateMenuBar()
     {
         Menu@ menu = CreateMenu("View");
         Window@ popup = menu.popup;
-        popup.AddChild(CreateMenuItem("Hierarchy", @ToggleHierarchyWindow, KEY_H, QUAL_CTRL));
-        popup.AddChild(CreateMenuItem("Attribute inspector", @ToggleAttributeInspectorWindow, KEY_I, QUAL_CTRL));
+     //   popup.AddChild(CreateMenuItem("Hierarchy", @ToggleHierarchyWindow, KEY_H, QUAL_CTRL));
+     //   popup.AddChild(CreateMenuItem("Attribute inspector", @ToggleAttributeInspectorWindow, KEY_I, QUAL_CTRL));
         popup.AddChild(CreateMenuItem("Resource browser", @ToggleResourceBrowserWindow, KEY_B, QUAL_CTRL));
         popup.AddChild(CreateMenuItem("Material editor", @ToggleMaterialEditor));
         popup.AddChild(CreateMenuItem("Particle editor", @ToggleParticleEffectEditor));
-        popup.AddChild(CreateMenuItem("Terrain editor", TerrainEditorShowCallback(terrainEditor.Show)));
-        popup.AddChild(CreateMenuItem("Spawn editor", @ToggleSpawnEditor));
-        popup.AddChild(CreateMenuItem("Sound Type editor", @ToggleSoundTypeEditor));
+     //   popup.AddChild(CreateMenuItem("Terrain editor", TerrainEditorShowCallback(terrainEditor.Show)));
+    //    popup.AddChild(CreateMenuItem("Spawn editor", @ToggleSpawnEditor));
+   //     popup.AddChild(CreateMenuItem("Sound Type editor", @ToggleSoundTypeEditor));
         popup.AddChild(CreateMenuItem("Editor settings", @ToggleEditorSettingsDialog));
         popup.AddChild(CreateMenuItem("Editor preferences", @ToggleEditorPreferencesDialog));
-        CreateChildDivider(popup);
-        popup.AddChild(CreateMenuItem("Hide editor", @ToggleUI, KEY_F12, QUAL_ANY));
+        popup.AddChild(CreateMenuItem("Editor NormalViewWindow", @ToggleEditorNormalViewWindow));
+        popup.AddChild(CreateMenuItem("Editor SelectEffectWindow", @ToggleEditorSelectEffectWindow));
+        
+       // CreateChildDivider(popup);
+       // popup.AddChild(CreateMenuItem("Hide editor", @ToggleUI, KEY_F12, QUAL_ANY));
+        FinalizedPopupMenu(popup);
+        uiMenuBar.AddChild(menu);
+    }
+    
+    {
+        Menu@ menu = CreateMenu("SetLanguage");
+        Window@ popup = menu.popup;
+        popup.AddChild(CreateMenuItem("ChineseLanguage", @SetChineseLanguageHandle));
+        popup.AddChild(CreateMenuItem("EnglishLanguage", @SetEnglishLanguageHandle));
+    //  CreateChildDivider(popup);
         FinalizedPopupMenu(popup);
         uiMenuBar.AddChild(menu);
     }
@@ -547,6 +573,17 @@ void CreateMenuBar()
     BorderImage@ spacer = BorderImage("MenuBarSpacer");
     uiMenuBar.AddChild(spacer);
     spacer.style = "EditorMenuBar";
+}
+
+bool SetEnglishLanguageHandle()
+{
+    localization.SetLanguage("en");
+    return true;
+}
+bool SetChineseLanguageHandle()
+{
+    localization.SetLanguage("zh");
+    return true;
 }
 
 bool Exit()
@@ -632,6 +669,12 @@ bool PickFile()
         CreateFileSelector("Load node", "Load", "Cancel", uiNodePath, uiSceneFilters, uiNodeFilter);
         SubscribeToEvent(uiFileSelector, "FileSelected", "HandleLoadNodeFile");
     }
+    else if (action == "menu Load node")
+    {
+        instantiateMode = REPLICATED;
+        CreateFileSelector("fileSelector Load node", "Load", "Cancel", uiNodePath, uiSceneFilters, uiNodeFilter);
+        SubscribeToEvent(uiFileSelector, "FileSelected", "HandleLoadNodeFile");
+    }
     else if (action == "Save node as...")
     {
         if (editNode !is null && editNode !is editorScene)
@@ -640,6 +683,10 @@ bool PickFile()
             uiFileSelector.fileName = GetFileNameAndExtension(instantiateFileName);
             SubscribeToEvent(uiFileSelector, "FileSelected", "HandleSaveNodeFile");
         }
+    }
+    else if (action == "Switch Asset...")
+    {
+        ShowSwitchAssetEditor();
     }
     else if (action == "Import model...")
     {
@@ -772,7 +819,7 @@ bool PickNode()
     if (action.empty)
         return false;
 
-    CreateNode(action == "Replicated node" ? REPLICATED : LOCAL);
+    CreateNode(action == "Replicated node" || action == "As node..." ? REPLICATED : LOCAL);
     return true;
 }
 
@@ -1136,7 +1183,7 @@ void UpdateWindowTitle()
         sceneName = "Untitled";
     if (sceneModified)
         sceneName += "*";
-    graphics.windowTitle = "Urho3D editor - " + sceneName;
+    graphics.windowTitle = "VKing - " + sceneName;
 }
 
 void HandlePopup(Menu@ menu)
@@ -1181,20 +1228,33 @@ String ExtractFileName(VariantMap& eventData, bool forSave = false)
 void HandleOpenSceneFile(StringHash eventType, VariantMap& eventData)
 {
     CloseFileSelector(uiSceneFilter, uiScenePath);
-    LoadScene(ExtractFileName(eventData));
-    SendEvent(EDITOR_EVENT_SCENE_LOADED);
+    if (eventData["OK"].GetBool())
+    {
+        LoadScene(ExtractFileName(eventData));
+        SendEvent(EDITOR_EVENT_SCENE_LOADED);
+    }
 }
 
 void HandleSaveSceneFile(StringHash eventType, VariantMap& eventData)
 {
     CloseFileSelector(uiSceneFilter, uiScenePath);
-    SaveScene(ExtractFileName(eventData, true));
+    if (eventData["OK"].GetBool())
+    {
+        SaveScene(ExtractFileName(eventData, true));
+    }
 }
 
 void HandleLoadNodeFile(StringHash eventType, VariantMap& eventData)
 {
     CloseFileSelector(uiNodeFilter, uiNodePath);
-    LoadNode(ExtractFileName(eventData));
+    if (eventData["OK"].GetBool())
+    {
+        String fileName = ExtractFileName(eventData);
+        String dir =  GetParentPath(fileName);
+        cache.AddResourceDir(dir, 0);
+        LoadNode(fileName);
+        //cache.RemoveResourceDir(dir);
+    }
 }
 
 void HandleSaveNodeFile(StringHash eventType, VariantMap& eventData)
@@ -1343,6 +1403,10 @@ void HandleHotKeysBlender( VariantMap& eventData)
         ToggleOctreeDebug();
     else if (key == KEY_F5)
         ToggleNavigationDebug();
+    else if (key == KEY_F6)
+        ToggleRenderingBoundingBox();
+    else if (key == KEY_F7)
+        gShowDebugIcons = !gShowDebugIcons;
     else if (key == KEY_F11)
     {
         Image@ screenshot = Image();
@@ -1351,6 +1415,10 @@ void HandleHotKeysBlender( VariantMap& eventData)
             fileSystem.CreateDir(screenshotDir);
         screenshot.SavePNG(screenshotDir + "/Screenshot_" +
                 time.timeStamp.Replaced(':', '_').Replaced('.', '_').Replaced(' ', '_') + ".png");
+    }
+    else if (key == KEY_F12)
+    {
+        ToggledStatsVisible();
     }
     // In Blender, HOME key is for locating the selected objects by pan and
     // the PERIOD key of keypad is for moving the camera to focus the selected.
@@ -1516,6 +1584,10 @@ void HandleHotKeysStandard(VariantMap& eventData)
         ToggleOctreeDebug();
     else if (key == KEY_F5)
         ToggleNavigationDebug();
+    else if (key == KEY_F6)
+        ToggleRenderingBoundingBox();
+    else if (key == KEY_F7)
+        gShowDebugIcons = !gShowDebugIcons;
     else if (key == KEY_F11)
     {
         Image@ screenshot = Image();
@@ -1524,6 +1596,10 @@ void HandleHotKeysStandard(VariantMap& eventData)
             fileSystem.CreateDir(screenshotDir);
         screenshot.SavePNG(screenshotDir + "/Screenshot_" +
                 time.timeStamp.Replaced(':', '_').Replaced('.', '_').Replaced(' ', '_') + ".png");
+    }
+    else if(key == KEY_F12)
+    {
+        ToggledStatsVisible();
     }
     else if ((key == KEY_HOME || key == KEY_F) && ui.focusElement is null)
     {
@@ -1719,6 +1795,7 @@ void IconizeUIElement(UIElement@ element, const String&in iconType)
         icon.indent = element.indent - 1;
         icon.SetFixedSize(element.indentWidth - 2, 14);
         element.InsertChild(0, icon);   // Ensure icon is added as the first child
+        icon.visible = !hideComponentIcon;
     }
 
     // Set the icon type

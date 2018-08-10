@@ -14,7 +14,7 @@ CustomGeometry@ grid;
 UIElement@ viewportUI; // holds the viewport ui, convienent for clearing and hiding
 uint setViewportCursor = 0; // used to set cursor in post update
 uint resizingBorder = 0; // current border that is dragging
-uint viewportMode = VIEWPORT_SINGLE;
+uint viewportMode = VIEWPORT_COMPACT;
 int  viewportBorderOffset = 2; // used to center borders over viewport seams,  should be half of width
 int  viewportBorderWidth = 4; // width of a viewport resize border
 IntRect viewportArea; // the area where the editor viewport is. if we ever want to have the viewport not take up the whole screen this abstracts that
@@ -22,7 +22,7 @@ IntRect viewportUIClipBorder = IntRect(27, 60, 0, 0); // used to clip viewport b
 RenderPath@ renderPath; // Renderpath to use on all views
 String renderPathName;
 bool gammaCorrection = false;
-bool HDR = false;
+bool HDR = true;
 bool contextMenuActionWaitFrame = false;
 bool cameraFlyMode = true;
 int hotKeyMode = 0; // used for checking that kind of style manipulation user are prefer (see HotKeysMode)
@@ -35,7 +35,7 @@ String coloringTypeName;
 String coloringPropertyName;
 Color coloringOldColor;
 float coloringOldScalar;
-bool debugRenderDisabled = false;
+bool debugRenderDisabled = true;
 bool restoreViewport = false;
 IntVector2 oldHierarchyWindowPosition; // used for restore hierarchy position when switch between viewport modes
 int oldHierarchyWindowHeight;
@@ -128,19 +128,47 @@ class ViewportContext
     LineEdit@ cameraOrthoSize;
     CheckBox@ cameraOrthographic;
 
+    EditorSelectEffect@ mEditorSelectEffect;
+    
     ViewportContext(IntRect viewRect, uint index_, uint viewportId_)
     {
-        cameraNode = Node();
-        cameraLookAtNode = Node();
-        cameraLookAtNode.AddChild(cameraNode);        
-        camera = cameraNode.CreateComponent("Camera");
+        if(gcameraLookAtNode !is null)
+        {
+            camera = gcamera;
+            cameraNode = gcameraNode;
+            cameraLookAtNode = gcameraLookAtNode;
+        }
+        else
+        {
+            cameraNode = Node();
+            cameraLookAtNode = Node();
+            cameraLookAtNode.AddChild(cameraNode);        
+            camera = cameraNode.CreateComponent("Camera");
+
+            gcamera = camera;
+            gcameraNode = cameraNode;
+            gcameraLookAtNode = cameraLookAtNode;
+        }
         orthoCameraZoom = camera.zoom;
         camera.fillMode = fillMode;
         soundListener = cameraNode.CreateComponent("SoundListener");
         viewport = Viewport(editorScene, camera, viewRect, renderPath);
+        viewport.EnableStaticShadow(true);
         index = index_;
         viewportId = viewportId_;
-        camera.viewMask = 0xffffffff; // It's easier to only have 1 gizmo active this viewport is shared with the gizmo
+        camera.viewMask = 0xffffffff; // It's easier to only have 1 gizmo active this viewport is shared with the gizmo       
+
+        mEditorSelectEffect = EditorSelectEffect(this);  
+    }
+
+    ~ViewportContext()
+    {
+        mEditorSelectEffect.ClearModelEffect();
+    }
+    
+    void DrawSelectEffect(Node@ node)
+    {
+        mEditorSelectEffect.DrawModelEffect(node);
     }
 
     void ResetCamera()
@@ -150,7 +178,7 @@ class ViewportContext
         cameraLookAtNode.position = Vector3(0, 0, 0);
         cameraLookAtNode.rotation = Quaternion();
 
-        cameraNode.position = Vector3(0, 5, -10);
+        cameraNode.position = Vector3(0, 5, -30);
         // Look at the origin so user can see the scene.
         cameraNode.rotation = Quaternion(Vector3(0, 0, 1), -cameraNode.position);
         ReacquireCameraYawPitch();
@@ -384,7 +412,7 @@ FillMode fillMode = FILL_SOLID;
 SnapScaleMode snapScaleMode = SNAP_SCALE_FULL;
 
 float viewNearClip = 0.1;
-float viewFarClip = 1000.0;
+float viewFarClip = 10000.0;
 float viewFov = 45.0;
 
 
@@ -426,16 +454,16 @@ enum NewNodeMode
 
 int newNodeMode = NEW_NODE_CAMERA_LOOKAT;
 
-bool showGrid = true;
+bool showGrid = false;
 bool grid2DMode = false;
-uint gridSize = 16;
-uint gridSubdivisions = 3;
-float gridScale = 8.0;
-Color gridColor(0.1, 0.1, 0.1);
-Color gridSubdivisionColor(0.05, 0.05, 0.05);
-Color gridXColor(0.5, 0.1, 0.1);
-Color gridYColor(0.1, 0.5, 0.1);
-Color gridZColor(0.1, 0.1, 0.5);
+uint gridSize = 100;
+uint gridSubdivisions = 10;
+float gridScale = 1.0;
+Color gridColor(0.5, 0.5, 0.5);
+Color gridSubdivisionColor(0.46, 0.46, 0.46);
+Color gridXColor(0.5, 0.5, 0.5);
+Color gridYColor(0.5, 0.5, 0.5);
+Color gridZColor(0.5, 0.5, 0.5);
 
 Array<int> pickModeDrawableFlags = {
     DRAWABLE_GEOMETRY,
@@ -662,6 +690,7 @@ void SetRenderPath(const String&in newRenderPathName)
     renderPath.SetEnabled("GammaCorrection", gammaCorrection);
 
     renderer.hdrRendering = HDR;
+    renderer.ableLogDepth = true;
 
     for (uint i = 0; i < renderer.numViewports; ++i)
         renderer.viewports[i].renderPath = renderPath;
@@ -845,7 +874,9 @@ void SetViewportMode(uint mode = VIEWPORT_SINGLE)
     }
 
     viewports.Clear();
-
+    renderer.numViewports = 0;
+    SetRenderPath(renderPathName);
+    
     if(mode == VIEWPORT_COMPACT)
     {
         // Remember old hierarchy/inspector height/positions
@@ -859,13 +890,13 @@ void SetViewportMode(uint mode = VIEWPORT_SINGLE)
 
         // Move and scale hierarchy window to left of screen
         ShowHierarchyWindow();
-        hierarchyWindow.position = IntVector2(secondaryToolBar.width,toolBar.height + uiMenuBar.height);
-        hierarchyWindow.height = viewportArea.height-(toolBar.height + uiMenuBar.height);
+        hierarchyWindow.position = IntVector2(secondaryToolBar.width,uiMenuBar.height);
+        hierarchyWindow.height = viewportArea.height-(uiMenuBar.height);
 
         // Move and scale inspector window to left of screen
         ShowAttributeInspectorWindow();
-        attributeInspectorWindow.position = IntVector2(viewportArea.width-attributeInspectorWindow.width,toolBar.height + uiMenuBar.height);
-        attributeInspectorWindow.height = viewportArea.height-(toolBar.height + uiMenuBar.height);
+        attributeInspectorWindow.position = IntVector2(viewportArea.width-attributeInspectorWindow.width,uiMenuBar.height);
+        attributeInspectorWindow.height = viewportArea.height-(uiMenuBar.height);
 
         // Hide close button and disable resize/movement inspector/hierarchy of windows
         attributeInspectorWindow.GetChild("CloseButton",true).visible = false;
@@ -874,7 +905,9 @@ void SetViewportMode(uint mode = VIEWPORT_SINGLE)
         hierarchyWindow.GetChild("CloseButton",true).visible = false;
         hierarchyWindow.resizable = false;
         hierarchyWindow.movable = false;
-
+        
+        toolBar.position = IntVector2(hierarchyWindow.width,uiMenuBar.height);
+        toolBar.width    = Max(ui.root.width - attributeInspectorWindow.width - hierarchyWindow.width , 0);
         // Create viewport on center of window
         {
             uint viewport = 0;
@@ -1044,7 +1077,7 @@ void UpdateCameraPreview()
 
         int previewWidth = graphics.width / 4;
         int previewHeight = previewWidth * 9 / 16;
-        int previewX = graphics.width - 10 - previewWidth;
+        int previewX = graphics.width - 10 - previewWidth - 400;
         int previewY = graphics.height - 30 - previewHeight;
 
         Viewport@ previewView = Viewport();
@@ -1366,12 +1399,12 @@ void UpdateGrid(bool updateGridGeometry = true)
     uint size = uint(Floor(gridSize / 2) * 2);
     float halfSizeScaled = size / 2;
     float scale = 1.0;
-    uint subdivisionSize = uint(Pow(2.0f, float(gridSubdivisions)));
+    uint subdivisionSize = uint(gridSubdivisions);
 
     if (subdivisionSize > 0)
     {
-        size *= subdivisionSize;
-        scale /= subdivisionSize;
+       // size *= subdivisionSize;
+      //  scale /= subdivisionSize;
     }
 
     uint halfSize = size / 2;
@@ -1421,6 +1454,7 @@ void CreateStatsBar()
     ui.root.AddChild(renderStatsText);
     modelInfoText = Text();
     ui.root.AddChild(modelInfoText);
+    ToggledStatsVisible();
 }
 
 void SetupStatsBarText(Text@ text, Font@ font, int x, int y, HorizontalAlignment hAlign, VerticalAlignment vAlign)
@@ -1432,6 +1466,15 @@ void SetupStatsBarText(Text@ text, Font@ font, int x, int y, HorizontalAlignment
     text.color = Color(1, 1, 0);
     text.textEffect = TE_SHADOW;
     text.priority = -100;
+}
+
+void ToggledStatsVisible()
+{
+    bool v = !editorModeText.visible;
+    
+    modelInfoText.visible   = v;
+    editorModeText.visible  = v;
+    renderStatsText.visible = v;
 }
 
 void UpdateStats(float timeStep)
@@ -1459,7 +1502,7 @@ void UpdateStats(float timeStep)
     renderStatsText.size = renderStatsText.minSize;
 
     // Relayout stats bar
-    Font@ font = cache.GetResource("Font", "Fonts/Anonymous Pro.ttf");
+    Font@ font = cache.GetResource("Font", "Fonts/simhei.ttf");
 
     if(viewportMode != VIEWPORT_COMPACT)
     {
@@ -1605,6 +1648,8 @@ void CameraZoom(float zoom)
 
 void HandleStandardUserInput(float timeStep)
 {
+    if(ui.GetElementAt(ui.cursor.position) !is null) return;
+
     // Speedup camera move if Shift key is down
     float speedMultiplier = 1.0;
     if (input.keyDown[KEY_LSHIFT])
@@ -1690,7 +1735,7 @@ void HandleStandardUserInput(float timeStep)
     // Rotate/orbit/pan camera
     bool changeCamViewButton = false;
     
-    changeCamViewButton = input.mouseButtonDown[MOUSEB_RIGHT] || input.mouseButtonDown[MOUSEB_MIDDLE];
+    changeCamViewButton = input.mouseButtonDown[MOUSEB_MIDDLE] || input.mouseButtonDown[MOUSEB_RIGHT];
 
     if (changeCamViewButton)
     {
@@ -1707,6 +1752,10 @@ void HandleStandardUserInput(float timeStep)
                     panTheCamera = !input.keyDown[KEY_LSHIFT];
                 else
                     panTheCamera = input.keyDown[KEY_LSHIFT];
+            }
+            else if(input.mouseButtonDown[MOUSEB_RIGHT])
+            {
+                panTheCamera = true;
             }
 
             // Pan the camera
@@ -1905,8 +1954,13 @@ void HandleBlenderUserInput(float timeStep)
             bool panTheCamera = false;
 
             if (!cameraFlyMode)
+            {
                 panTheCamera = input.keyDown[KEY_LSHIFT];
-
+            }
+            else if(input.mouseButtonDown[MOUSEB_RIGHT])
+            {
+                panTheCamera = true;
+            }
             if (panTheCamera)
             {
                 Vector3 right = -cameraNode.worldRight;
@@ -2112,9 +2166,26 @@ void SteppedObjectManipulation(int key)
 void HandlePostRenderUpdate()
 {
     DebugRenderer@ debug = editorScene.debugRenderer;
-    if (debug is null || orbiting || debugRenderDisabled)
+    if (debug is null || orbiting )
         return;
 
+    if (renderingDebug)
+    {
+        renderer.DrawDebugGeometry(false);
+    }
+    if(debugRenderDisabled) 
+    {
+        for (uint i = 0; i < selectedComponents.length; ++i)
+        {   
+            DrawLightDebug(selectedComponents[i], debug);
+        }
+        for (uint i = 0; i < selectedNodes.length; ++i)
+        {
+            DrawNodeLightDebug(selectedNodes[i], debug);
+        }
+        return;
+    }
+    
     // Visualize the currently selected nodes
     for (uint i = 0; i < selectedNodes.length; ++i)
         DrawNodeDebug(selectedNodes[i], debug);
@@ -2126,9 +2197,6 @@ void HandlePostRenderUpdate()
     // Visualize the currently selected UI-elements
     for (uint i = 0; i < selectedUIElements.length; ++i)
         ui.DebugDraw(selectedUIElements[i]);
-
-    if (renderingDebug)
-        renderer.DrawDebugGeometry(false);
 
     if (physicsDebug && editorScene.physicsWorld !is null)
         editorScene.physicsWorld.DrawDebugGeometry(true);
@@ -2193,6 +2261,38 @@ void DrawNodeDebug(Node@ node, DebugRenderer@ debug, bool drawNode = true)
         // To avoid cluttering the view, do not draw the node axes for child nodes
         for (uint k = 0; k < node.numChildren; ++k)
             DrawNodeDebug(node.children[k], debug, false);
+    }
+}
+
+
+void DrawNodeLightDebug(Node@ node, DebugRenderer@ debug)
+{
+    if (node !is editorScene && node.GetComponent("Terrain") is null)
+    {
+        for (uint j = 0; j < node.numComponents; ++j)
+        {
+            DrawLightDebug(node.components[j], debug);
+        }
+
+        for (uint k = 0; k < node.numChildren; ++k)
+        {
+            DrawNodeLightDebug(node.children[k], debug);
+        }
+    }
+}
+
+void DrawLightDebug(Component@ component, DebugRenderer@ debug)
+{
+    Light@ light = cast<Light>(component);
+    if(light !is null)
+    {
+        component.DrawDebugGeometry(debug, false);
+    }
+
+    Camera@ camera = cast<Camera>(component);
+    if(camera !is null)
+    {
+        component.DrawDebugGeometry(debug, false);
     }
 }
 
@@ -2489,7 +2589,14 @@ void SetShadowResolution(int level)
 
 void ToggleRenderingDebug()
 {
+  //  renderingDebug = !renderingDebug;
+    debugHud.ToggleAll();
+}
+
+void ToggleRenderingBoundingBox()
+{
     renderingDebug = !renderingDebug;
+  //  debugHud.ToggleAll();
 }
 
 void TogglePhysicsDebug()
@@ -2793,5 +2900,19 @@ void HandleEndViewRender(StringHash eventType, VariantMap& eventData)
             debug.enabled = debugWasEnabled;
             suppressSceneChanges = false;
         }
+    }
+}
+
+void DrawSelectEffect()
+{
+    Node@ outlinenode=null;
+    if(editNodes.length > 0 && editNodes[0] !is editorScene)
+    {
+        outlinenode = editNodes[0];
+    }
+
+    for(int i=0; i < viewports.length; ++i)
+    {      
+        viewports[i].DrawSelectEffect(outlinenode);
     }
 }

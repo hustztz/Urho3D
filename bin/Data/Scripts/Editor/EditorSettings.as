@@ -8,6 +8,8 @@ void CreateEditorSettingsDialog()
     if (settingsDialog !is null)
         return;
     
+    SetShadowResolution(3);
+    renderer.shadowQuality = ShadowQuality::SHADOWQUALITY_VSM;
     settingsDialog = LoadEditorUI("UI/EditorSettingsDialog.xml");
     ui.root.AddChild(settingsDialog);
     settingsDialog.opacity = uiMaxOpacity;

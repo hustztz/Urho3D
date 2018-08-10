@@ -15,6 +15,7 @@ void CreateToolBar()
     toolBar.opacity = uiMaxOpacity;
     toolBar.SetFixedSize(graphics.width, 42);
     toolBar.SetPosition(0, uiMenuBar.height);
+    toolBar.clipChildren = true;
     ui.root.AddChild(toolBar);
 
     UIElement@ runUpdateGroup = CreateGroup("RunUpdateGroup", LM_HORIZONTAL);
@@ -23,6 +24,7 @@ void CreateToolBar()
     runUpdateGroup.AddChild(CreateToolBarToggle("RevertOnPause"));
     FinalizeGroupHorizontal(runUpdateGroup, "ToolBarToggle");
     toolBar.AddChild(runUpdateGroup);
+  //  runUpdateGroup.visible = !toolBarCullFunction;
 
     toolBar.AddChild(CreateToolBarSpacer(4));
     UIElement@ editModeGroup = CreateGroup("EditModeGroup", LM_HORIZONTAL);
@@ -40,15 +42,28 @@ void CreateToolBar()
     toolBar.AddChild(axisModeGroup);
 
     toolBar.AddChild(CreateToolBarSpacer(4));
-    toolBar.AddChild(CreateToolBarToggle("MoveSnap"));
-    toolBar.AddChild(CreateToolBarToggle("RotateSnap"));
-    toolBar.AddChild(CreateToolBarToggle("ScaleSnap"));
+    {
+        CheckBox@ box = CreateToolBarToggle("MoveSnap");
+        box.visible = !toolBarCullFunction;
+        toolBar.AddChild(box);
+    }
+    {
+        CheckBox@ box = CreateToolBarToggle("RotateSnap");
+        box.visible = !toolBarCullFunction;
+        toolBar.AddChild(box);
+    }
+    {
+        CheckBox@ box = CreateToolBarToggle("ScaleSnap");
+        box.visible = !toolBarCullFunction;
+        toolBar.AddChild(box);
+    }
 
     UIElement@ snapScaleModeGroup = CreateGroup("SnapScaleModeGroup", LM_HORIZONTAL);
     snapScaleModeGroup.AddChild(CreateToolBarToggle("SnapScaleHalf"));
     snapScaleModeGroup.AddChild(CreateToolBarToggle("SnapScaleQuarter"));
     FinalizeGroupHorizontal(snapScaleModeGroup, "ToolBarToggle");
     toolBar.AddChild(snapScaleModeGroup);
+    snapScaleModeGroup.visible = !toolBarCullFunction;
 
     toolBar.AddChild(CreateToolBarSpacer(4));
     UIElement@ pickModeGroup = CreateGroup("PickModeGroup", LM_HORIZONTAL);
@@ -73,7 +88,8 @@ void CreateToolBar()
     originGroup.AddChild(CreateToolBarToggle("ShowOrigin"));
     FinalizeGroupHorizontal(originGroup, "ToolBarToggle");
     toolBar.AddChild(originGroup);
-
+    originGroup.visible = !toolBarCullFunction;
+/*
     toolBar.AddChild(CreateToolBarSpacer(4));
     DropDownList@ viewportModeList = DropDownList();
     viewportModeList.style = AUTO_STYLE;
@@ -97,7 +113,7 @@ void CreateToolBar()
             break;
         }
     }
-    SubscribeToEvent(viewportModeList, "ItemSelected", "ToolBarSetViewportMode");
+    SubscribeToEvent(viewportModeList, "ItemSelected", "ToolBarSetViewportMode");*/
 }
 
 Button@ CreateToolBarButton(const String&in title)
