@@ -2166,7 +2166,7 @@ void SteppedObjectManipulation(int key)
 void HandlePostRenderUpdate()
 {
     DebugRenderer@ debug = editorScene.debugRenderer;
-    if (debug is null || orbiting )
+    if (debug is null || orbiting || gShowDebugIcons == false)
         return;
 
     if (renderingDebug)
@@ -2241,8 +2241,10 @@ void HandlePostRenderUpdate()
         if (resizingBorder == 0)
             setViewportCursor = 0;
     }
-
-    ViewRaycast(false);
+    if(ableUpdateCastRay)
+    {
+        ViewRaycast(false);
+    }
 }
 
 void DrawNodeDebug(Node@ node, DebugRenderer@ debug, bool drawNode = true)
@@ -2301,7 +2303,7 @@ void ViewMouseMove()
     Ray cameraRay = GetActiveViewportCameraRay();
     Component@ selectedComponent;
 
-    if (pickMode < PICK_RIGIDBODIES && editorScene.octree !is null)
+    if (ableUpdateCastRay && pickMode < PICK_RIGIDBODIES && editorScene.octree !is null)
     {
         RayQueryResult result = editorScene.octree.RaycastSingle(cameraRay, RAY_TRIANGLE, camera.farClip,
             pickModeDrawableFlags[pickMode], 0x7fffffff);
@@ -2422,7 +2424,6 @@ void ViewRaycast(bool mouseClick)
     {
         if (editorScene.octree is null)
             return;
-
         RayQueryResult result = editorScene.octree.RaycastSingle(cameraRay, RAY_TRIANGLE, camera.farClip,
             pickModeDrawableFlags[pickMode], 0x7fffffff);
 

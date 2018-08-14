@@ -1,0 +1,3 @@
+<technique vs="DynamicSkybox" ps="DynamicSkybox" psdefines="HDRSCALE">
+    <pass name="postopaque" vs="DynamicSkybox" ps="DynamicSkybox" psdefines="HDRSCALE" depthwrite="false" />
+</technique>

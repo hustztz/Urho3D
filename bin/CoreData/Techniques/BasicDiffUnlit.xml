@@ -1,0 +1,3 @@
+<technique vs="Basic" ps="Basic" vsdefines=" " psdefines=" ">
+    <pass name="alpha"/>
+</technique>

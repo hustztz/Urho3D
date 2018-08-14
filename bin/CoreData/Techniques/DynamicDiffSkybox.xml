@@ -1,0 +1,3 @@
+<technique vs="DynamicSkybox" ps="DynamicSkybox" >
+    <pass name="postopaque" vs="DynamicSkybox" ps="DynamicSkybox" depthwrite="false" />
+</technique>

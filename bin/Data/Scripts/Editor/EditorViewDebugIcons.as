@@ -235,7 +235,14 @@ void UpdateViewDebugIcons()
                         bb.size = debugIconsSize;
 
                         // Blend Icon relatively by distance to it
-                        bb.color = Color(finalIconColor.r, finalIconColor.g, finalIconColor.b, 1.2f - 1.0f / (maxDistance / distance));
+                        if(distance > 1.0)
+                        {
+                            bb.color = Color(finalIconColor.r, finalIconColor.g, finalIconColor.b, 1.2f - 1.0f / (maxDistance / distance));
+                        }
+                        else
+                        {
+                            bb.color = Color(finalIconColor.r, finalIconColor.g, finalIconColor.b, 1.0f);
+                        }
                         bb.enabled = component.enabled;
                         // Discard billboard if it almost transparent
                         if (bb.color.a < debugIconAlphaThreshold)

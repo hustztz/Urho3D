@@ -1,0 +1,10 @@
+<material>
+    <technique name="Techniques/DynamicDiffSkyboxHDRScale.xml" />
+    <parameter name="Ratio" value="0.2" />
+	<parameter name="CloudsMoveSpeed" value="1." />
+	<parameter name="CloudsChangeSpeed" value="0.5" />
+	<texture unit="diffuse" name="Textures/Noise/tex11.png" />
+	<texture unit="normal" name="Textures/DayNight/moon.png" />
+	<texture unit="specular" name="Textures/DayNight/stars.png" />
+    <cull value="none" />
+</material>

@@ -216,9 +216,9 @@ namespace Urho3D
 //					ambientColor = 0.8;
 //			}
 			//URHO3D_LOGERROR(String("Ambient:") + ambientColor);
-			Vector3 ambientColor = ComputeAmbientLight(Vector3(0, earthRadius, 0), Vector3(0,1,0), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_))*1.4;
-			ambientColor += ComputeAmbientLight(Vector3(0, earthRadius, 0), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_))*1.4;
-			float maxAmbinetColor = Max(Max(ambientColor.x_, ambientColor.y_), ambientColor.z_);
+			Vector3 ambientColor = ComputeAmbientLight(Vector3(0, earthRadius, 0), Vector3(0,1,0), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_))*1.;
+			ambientColor += ComputeAmbientLight(Vector3(0, earthRadius, 0), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_))*0.5;
+			float maxAmbinetColor = Max(Max(ambientColor.x_, ambientColor.y_), ambientColor.z_)*2.5;
 			ambientColor += Vector3(maxAmbinetColor, maxAmbinetColor, maxAmbinetColor);
 			if (!isHDR_)
 			{
