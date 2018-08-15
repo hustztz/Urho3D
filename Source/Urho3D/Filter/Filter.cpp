@@ -4,6 +4,7 @@
 #include "../Math/StringHash.h"
 #include "../Graphics/Viewport.h"
 #include "../Graphics/RenderPath.h"
+#include "../Graphics/GraphicsEvents.h"
 
 namespace Urho3D
 {
@@ -29,7 +30,7 @@ namespace Urho3D
 		if (isEnable_)
 		{
 			SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(Filter, HandleUpdate));
-			SubscribeToEvent(E_POSTUPDATE, URHO3D_HANDLER(Filter, HandlePostUpdate));
+			SubscribeToEvent(E_ENDRENDERING, URHO3D_HANDLER(Filter, HandlePostUpdate));
 		}
 		else
 		{
@@ -53,11 +54,6 @@ namespace Urho3D
 
 	void Filter::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 	{
-		using namespace PostUpdate;
-
-		// Take the frame time step, which is stored as a float
-		float timeStep = eventData[P_TIMESTEP].GetFloat();
-
-		PostUpdate(timeStep);
+		PostUpdate();
 	}
 }

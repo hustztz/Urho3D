@@ -39,5 +39,7 @@ URHO3D_API unsigned GetRandomSeed();
 URHO3D_API int Rand();
 /// Return a standard normal distributed number.
 URHO3D_API float RandStandardNormal();
+/// Return a Halton random number, range 0..1
+URHO3D_API float HaltonRandom(unsigned index, unsigned base);
 
 }

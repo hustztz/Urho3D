@@ -58,4 +58,18 @@ float RandStandardNormal()
     return val;
 }
 
+URHO3D_API float HaltonRandom(unsigned index, unsigned base)
+{
+	float result = 0.f;
+	float invBase = 1.f / base;
+	float fraction = invBase;
+	while(index > 0)
+	{
+		result += (index % base) * fraction;
+		index /= base;
+		fraction *= invBase;
+	}
+	return result;
+}
+
 }

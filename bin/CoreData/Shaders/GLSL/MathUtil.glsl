@@ -39,4 +39,34 @@ float simplex_noise(vec2 p)
     // 之所以乘上70，是在计算了n每个分量的和的最大值以后得出的，这样才能保证将n各个分量相加以后的结果在[-1, 1]之间
     return dot(vec3(70.0, 70.0, 70.0), n);
 }
+
+//note: normalized random, float=[0;1]
+float PDnrand( vec2 n ) {
+	return fract( sin(dot(n.xy, vec2(12.9898, 78.233)))* 43758.5453 );
+}
+vec2 PDnrand2( vec2 n ) {
+	return fract( sin(dot(n.xy, vec2(12.9898, 78.233)))* vec2(43758.5453, 28001.8384) );
+}
+vec3 PDnrand3( vec2 n ) {
+	return fract( sin(dot(n.xy, vec2(12.9898, 78.233)))* vec3(43758.5453, 28001.8384, 50849.4141 ) );
+}
+vec4 PDnrand4( vec2 n ) {
+	return fract( sin(dot(n.xy, vec2(12.9898, 78.233)))* vec4(43758.5453, 28001.8384, 50849.4141, 12996.89) );
+}
+
+//====
+//note: signed random, float=[-1;1]
+float PDsrand( vec2 n ) {
+	return PDnrand( n ) * 2 - 1;
+}
+vec2 PDsrand2( vec2 n ) {
+	return PDnrand2( n ) * 2 - 1;
+}
+vec3 PDsrand3( vec2 n ) {
+	return PDnrand3( n ) * 2 - 1;
+}
+vec4 PDsrand4( vec2 n ) {
+	return PDnrand4( n ) * 2 - 1;
+}
+
 #endif

@@ -23,7 +23,7 @@ namespace Urho3D
 		virtual void SetEnable(bool enable);
 		bool IsEnable() { return isEnable_; };
 		virtual void Update(float timeStep){};
-		virtual void PostUpdate(float timeStep) {};
+		virtual void PostUpdate() {};
 	private:
 		void HandleUpdate(StringHash eventType, VariantMap& eventData);
 		void HandlePostUpdate(StringHash eventType, VariantMap& eventData);

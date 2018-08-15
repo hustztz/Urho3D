@@ -1,9 +1,9 @@
 <renderpath>	
-	<command type="quad" tag="edl" vs="Edl" ps="Edl" output="viewport">
+	<command type="quad" tag="edl" vs="Edl" ps="Edl" psdefine="HWDEPTH" output="viewport">
 		<texture unit="diffuse" name="viewport" />
 		<texture unit="depth" name="depth" />
 		<parameter name="Pix_scale" value="2.0" />
-		<parameter name="Exp_scale" value="100.0" />
+		<parameter name="Exp_scale" value="1.0" />
 		<parameter name="Light_dir" value="0.0 0.0 1.0" />
     </command>
 </renderpath>

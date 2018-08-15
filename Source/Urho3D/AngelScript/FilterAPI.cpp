@@ -15,6 +15,7 @@
 #include "Graphics/Viewport.h"
 #include "Graphics/Effects/DayNightWeatherControl.h"
 #include "Filter/LensFlareFilter.h"
+#include "Filter/AfterHDRAndBloomFilter.h"
 
 namespace Urho3D
 {
@@ -152,6 +153,12 @@ namespace Urho3D
 		engine->RegisterObjectBehaviour("DeferredHBAOFilter", asBEHAVE_FACTORY, "DeferredHBAOFilter@+ f(Viewport@+ )", asFUNCTION(ConstructDeferredHBAOFilter), asCALL_CDECL);
 		engine->RegisterObjectMethod("DeferredHBAOFilter", "void SetHBAOQuality(HBAOQuality)", asMETHOD(DeferredHBAOFilter, SetHBAOQuality), asCALL_THISCALL);
 		engine->RegisterObjectMethod("DeferredHBAOFilter", "void SetHBAOIntensity(float)", asMETHOD(DeferredHBAOFilter, SetHBAOIntensity), asCALL_THISCALL);
+		engine->RegisterObjectMethod("DeferredHBAOFilter", "void SetAORadius(float)", asMETHOD(DeferredHBAOFilter, SetAORadius), asCALL_THISCALL);
+		engine->RegisterObjectMethod("DeferredHBAOFilter", "void SetAONumDir(float)", asMETHOD(DeferredHBAOFilter, SetAONumDir), asCALL_THISCALL);
+		engine->RegisterObjectMethod("DeferredHBAOFilter", "void SetAONumSteps(float)", asMETHOD(DeferredHBAOFilter, SetAONumSteps), asCALL_THISCALL);
+		engine->RegisterObjectMethod("DeferredHBAOFilter", "void SetAOAttenuation(float)", asMETHOD(DeferredHBAOFilter, SetAOAttenuation), asCALL_THISCALL);
+		engine->RegisterObjectMethod("DeferredHBAOFilter", "void SetAOAngleBias(float)", asMETHOD(DeferredHBAOFilter, SetAOAngleBias), asCALL_THISCALL);
+		engine->RegisterObjectMethod("DeferredHBAOFilter", "void SetBilateralBlurRadius(float)", asMETHOD(DeferredHBAOFilter, SetBilateralBlurRadius), asCALL_THISCALL);
 	}
 	
 	static LensFlareFilter* ConstructLensFlareFilter(Viewport* viewPort)
@@ -164,6 +171,18 @@ namespace Urho3D
 		RegisterFilterBaseAPI<LensFlareFilter>(engine, "LensFlareFilter");
 		engine->RegisterObjectBehaviour("LensFlareFilter", asBEHAVE_FACTORY, "LensFlareFilter@+ f(Viewport@+ )", asFUNCTION(ConstructLensFlareFilter), asCALL_CDECL);
 		engine->RegisterObjectMethod("LensFlareFilter", "void SetEnable(bool)", asMETHOD(LensFlareFilter, SetEnable), asCALL_THISCALL);
+	}
+
+	static AfterHDRANDBloomFilter* ConstructAfterHDRANDBloomFilter(Viewport* viewPort)
+	{
+		return new AfterHDRANDBloomFilter(GetScriptContext(), viewPort);
+	}
+
+	static void RegisterAfterHDRANDBloomFilter(asIScriptEngine* engine)
+	{
+		RegisterFilterBaseAPI<AfterHDRANDBloomFilter>(engine, "AfterHDRANDBloomFilter");
+		engine->RegisterObjectBehaviour("AfterHDRANDBloomFilter", asBEHAVE_FACTORY, "AfterHDRANDBloomFilter@+ f(Viewport@+ )", asFUNCTION(ConstructAfterHDRANDBloomFilter), asCALL_CDECL);
+		
 	}
 
 	static void RegisterModelEffectUtilAPI(asIScriptEngine* engine)
@@ -265,6 +284,7 @@ namespace Urho3D
 		RegisterHDRFilter(engine);
 		RegisterBloomHDRFilter(engine);
 		RegisterLensFlareFilter(engine);
+		RegisterAfterHDRANDBloomFilter(engine);
 
 		RegisterOuterElecEffectFilter(engine);
 		RegisterVolumeInfluenceFilter(engine);
