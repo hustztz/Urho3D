@@ -57,11 +57,11 @@ bool AgVoxelLidarPoints::BeginLoad(Deserializer& source)
 		}
 	}
 
-	m_timeStampList.resize(amountOfPoints);
+	/*m_timeStampList.resize(amountOfPoints);
 	for (unsigned i = 0; i < amountOfPoints; ++i)
 	{
 		m_timeStampList[i] = source.ReadDouble();
-	}
+	}*/
 
 	return true;
 }
@@ -79,7 +79,7 @@ bool AgVoxelLidarPoints::EndLoad()
 	// Upload vertex buffer data
 	if(!vertexBuffers_)
 		vertexBuffers_ = new VertexBuffer(context_);
-	vertexBuffers_->SetShadowed(false);
+	vertexBuffers_->SetShadowed(true);
 	vertexBuffers_->SetSize(m_lidarPointList.size(), elements);
 	vertexBuffers_->SetData(m_lidarPointList.data());
 	
@@ -89,7 +89,9 @@ bool AgVoxelLidarPoints::EndLoad()
 	geometry_->SetVertexBuffer(0, vertexBuffers_);
 
 	m_lidarPointList.clear();
+	std::vector<AgLidarPoint>().swap(m_lidarPointList);
 	m_timeStampList.clear();
+	std::vector<double>().swap(m_timeStampList);
 
 	return true;
 }

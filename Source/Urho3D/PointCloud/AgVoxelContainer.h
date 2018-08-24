@@ -32,6 +32,9 @@ namespace ambergris {
 			/// Register object factory. Drawable must be registered first.
 			static void RegisterObject(Urho3D::Context* context);
 
+			/// Process octree raycast. May be called from a worker thread.
+			void ProcessRayQuery(const Urho3D::RayOctreeQuery& query, Urho3D::PODVector<Urho3D::RayQueryResult>& results) override;
+
 			/// Calculate distance and prepare batches for rendering. May be called from worker thread(s), possibly re-entrantly.
 			void UpdateBatches(const Urho3D::FrameInfo& frame) override;
 

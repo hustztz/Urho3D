@@ -10,6 +10,7 @@
 #include "../Graphics/Camera.h"
 #include "../Graphics/Geometry.h"
 #include "../Graphics/Material.h"
+#include "../Graphics/OctreeQuery.h"
 #include "../Resource/ResourceCache.h"
 #include "../Resource/ResourceEvents.h"
 
@@ -46,6 +47,63 @@ void AgVoxelContainer::RegisterObject(Context* context)
 	URHO3D_ACCESSOR_ATTRIBUTE("Maximum LOD", GetMaxLOD, SetMaxLOD, int, 0, AM_FILE);
 	URHO3D_ACCESSOR_ATTRIBUTE("SVO Bounds Min", GetSVOBoundsMin, SetSVOBoundsMin, Vector3, Vector3::ZERO, AM_FILE);
 	URHO3D_ACCESSOR_ATTRIBUTE("SVO Bounds Max", GetSVOBoundsMax, SetSVOBoundsMax, Vector3, Vector3::ZERO, AM_FILE);
+}
+
+void AgVoxelContainer::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQueryResult>& results)
+{
+	RayQueryLevel level = query.level_;
+
+	switch (level)
+	{
+	case RAY_AABB:
+		Drawable::ProcessRayQuery(query, results);
+		break;
+
+	case RAY_OBB:
+	case RAY_TRIANGLE:
+	case RAY_TRIANGLE_UV:
+		Matrix3x4 inverse(node_->GetWorldTransform().Inverse());
+		Ray localRay = query.ray_.Transformed(inverse);
+		float distance = localRay.HitDistance(boundingBox_);
+		Vector3 normal = -query.ray_.direction_;
+		Vector2 geometryUV;
+		unsigned hitBatch = M_MAX_UNSIGNED;
+
+		float pointSize = node_->GetVar(VoxelTreeRunTimeVars::VAR_POINTSIZE).GetFloat();
+		if (pointSize < 1.0f)
+			pointSize = 1.0f;
+
+		if (level >= RAY_TRIANGLE && distance < query.maxDistance_)
+		{
+			distance = M_INFINITY;
+
+			for (unsigned i = 0; i < batches_.Size(); ++i)
+			{
+				Geometry* geometry = batches_[i].geometry_;
+				if (geometry)
+				{
+					float geometryDistance = geometry->GetPointHitDistance(localRay, pointSize);
+					if (geometryDistance < query.maxDistance_ && geometryDistance < distance)
+					{
+						distance = geometryDistance;
+						hitBatch = i;
+					}
+				}
+			}
+		}
+
+		if (distance < query.maxDistance_)
+		{
+			RayQueryResult result;
+			result.position_ = query.ray_.origin_ + distance * query.ray_.direction_;
+			result.distance_ = distance;
+			result.drawable_ = this;
+			result.node_ = node_;
+			result.subObject_ = hitBatch;
+			results.Push(result);
+		}
+		break;
+	}
 }
 
 uint8_t  AgVoxelContainer::CalcLOD(const FrameInfo& frame, float pointSize)
@@ -567,7 +625,7 @@ void AgVoxelContainer::HandleUpdate(StringHash eventType, VariantMap& eventData)
 {
 	const bool isLidarData = node_->GetVar(VoxelTreeRunTimeVars::VAR_LIDARDATA).GetBool();
 	const int oldLod = batches_.Size();
-	if (!batches_.Empty() && (oldLod - (int)currentDrawLOD_ > 3))
+	if (currentDrawLOD_ < 6 || (oldLod - (int)currentDrawLOD_ > 3))
 	{
 		for (unsigned i = currentDrawLOD_; i < oldLod; i++)
 		{
