@@ -44,6 +44,9 @@ Camera@ gcamera;
 Node@ gcameraLookAtNode;
 Node@ gcameraNode;
 
+Node@ gPointCloudPick;
+BillboardGUIDrawable@ gPointCloudPickbd;
+
 void ClearSceneSelection()
 {
     selectedNodes.Clear();
@@ -92,9 +95,18 @@ bool ResetScene()
 
     // Create a scene with default values, these will be overridden when loading scenes
     editorScene.Clear();
-    editorScene.CreateComponent("Octree");
+    Octree@ octree = editorScene.CreateComponent("Octree");
     editorScene.CreateComponent("DebugRenderer");
     editorScene.CreateComponent("DayNightWeatherControl");
+    gPointCloudPick   = Node();
+    gPointCloudPick.position = Vector3(-10000000, -10000000, -10000000);
+    gPointCloudPickbd = gPointCloudPick.CreateComponent("BillboardGUIDrawable");
+    gPointCloudPickbd.SetFadeFarDistance(1000000);
+    gPointCloudPickbd.SetVisible(false);
+    gPointCloudPickbd.SetDefaultTexture(cache.GetResource("Texture2D", "Textures/Editor/pickring.png"));
+    
+   // gPointCloudPickbd.SetOnTop(true);
+    octree.AddManualDrawable(gPointCloudPickbd);
     /*
     Skybox@ skybox  = editorScene.CreateComponent("Skybox");
     skybox.model    = cache.GetResource("Model", "Models/Box.mdl");
@@ -435,6 +447,12 @@ Node@ InstantiateNodeFromFile(File@ file, const Vector3& position, const Quatern
         newNode = editorScene.InstantiateXML(file, position, rotation, mode);
     else if (extension == ".json")
         newNode = editorScene.InstantiateJSON(file, position, rotation, mode);
+    else if (extension == ".gltf")
+    {
+        newNode = editorScene.CreateChild(file.name);
+        newNode.LoadAssimp(cache.GetResource("AssimpFile", file.name));
+      //  newNode.LoadVK3D(file);
+    }
     else
         newNode = editorScene.Instantiate(file, position, rotation, mode);
 
@@ -667,6 +685,7 @@ bool SceneDelete()
             viewports[i].viewport.UpdateStaticShadow();
         }
     }
+    cache.ReleaseAllResources(false);
     return true;
 }
 

@@ -1,0 +1,36 @@
+<renderpath>
+
+
+	<rendertarget name="hdr128" tag="AutoExposure" size="128 128" format="rgba16f" filter="true" />
+    <rendertarget name="lum64" tag="AutoExposure" size="64 64" format="rg16f" filter="true" />
+    <rendertarget name="lum16" tag="AutoExposure" size="16 16" format="rg16f" filter="true" />
+    <rendertarget name="lum4" tag="AutoExposure" size="4 4" format="rg16f" filter="true" />
+    <rendertarget name="lum1" tag="AutoExposure" size="1 1" format="rg16f" filter="false" />
+    <rendertarget name="adaptedLum" tag="AutoExposure" size="1 1" format="rg16f" filter="false" persistent="true" />
+    <rendertarget name="prevAdaptedLum" tag="AutoExposure" size="1 1" format="rg16f" filter="false" />
+
+	
+	<command type="quad" tag="AutoExposure" vs="CopyFramebuffer" ps="CopyFramebuffer" output="hdr128">
+        <texture unit="diffuse" name="viewport" />
+    </command>
+    <command type="quad" tag="AutoExposure" vs="AutoExposure" ps="AutoExposure" vsdefines="LUMINANCE64" psdefines="LUMINANCE64" output="lum64">
+        <texture unit="diffuse" name="hdr128" />
+    </command>
+    <command type="quad" tag="AutoExposure" vs="AutoExposure" ps="AutoExposure" vsdefines="LUMINANCE16" psdefines="LUMINANCE16" output="lum16">
+        <texture unit="diffuse" name="lum64" />
+    </command>
+    <command type="quad" tag="AutoExposure" vs="AutoExposure" ps="AutoExposure" vsdefines="LUMINANCE4" psdefines="LUMINANCE4" output="lum4">
+        <texture unit="diffuse" name="lum16" />
+    </command>
+    <command type="quad" tag="AutoExposure" vs="AutoExposure" ps="AutoExposure" vsdefines="LUMINANCE1" psdefines="LUMINANCE1" output="lum1">
+        <texture unit="diffuse" name="lum4" />
+	</command>
+
+	<command type="quad" enabled="true" tag="TonemapUncharted2" vs="Tonemap" ps="Tonemap" psdefines="UNCHARTED2 MEANLUM" output="viewport">
+        <texture unit="normal" name="lum1" />
+        <texture unit="diffuse" name="viewport" />
+		<parameter name="TonemapExposureBias" value="1.0" />
+		<parameter name="TonemapMaxWhite" value="4.0" />
+    </command>
+
+</renderpath>

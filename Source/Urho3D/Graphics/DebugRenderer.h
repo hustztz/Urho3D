@@ -192,6 +192,8 @@ private:
     SharedPtr<VertexBuffer> vertexBuffer_;
     /// Line antialiasing flag.
     bool lineAntiAlias_;
+	/// camera is Orthographic
+	bool isOrthographic_;
 };
 
 }

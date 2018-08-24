@@ -1,0 +1,8 @@
+<renderpath>
+	<command type="quad" tag="ProjectiveTextureMapping" vs="ProjectiveTextureMapping" ps="ProjectiveTextureMapping" vsdefines="HWDEPTH" psdefines="HWDEPTH" blend = "replace" output="viewport">
+        <texture unit="depth" name="depth" />
+		<texture unit="diffuse" name="viewport" />
+		<texture unit="normal" name="projectiveTexture.manual" />
+		<parameter name="PTMViewProjectionMatrix" value="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0" />
+    </command>
+</renderpath>

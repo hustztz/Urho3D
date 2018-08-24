@@ -11,7 +11,7 @@ class DrawEffectDesc
     DrawEffectFunc@   mDrawEffectFunc;
     CancelEffectFunc@ mClearEffectFunc;
     EditorSelectEffectInfoData@ mSaveData;
-    float titlew  = 60;
+    float titlew  = 80;
     float offsetx = 25;
     float width   = 250;
     float height  = 16;
@@ -284,12 +284,18 @@ class EditorSelectEffect
     UnshadedColorFilter@ mUnshadedColorFilter;
     TranslucentFilter@ mTranslucentFilter;
     VolumeInfluenceFilter@ mVolumeInfluenceFilter;
-
+    AfterHDRANDBloomFilter@ mAfterHDRANDBloomFilter;
+    
     HDRFilter@ mHDRFilter;
     SMAAFilter@ mSMAAFilter;
+    TemporalAAFilter@ mTemporalAAFilter;
     BloomHDRFilter@ mBloomHDRFilter;
     DeferredHBAOFilter@ mDeferredHBAOFilter;
     LensFlareFilter@ mLensFlareFilter;
+    TranslucentAfterHDRFilter@ mTranslucentAfterHDRFilter;
+    DepthOfFieldFilter@ mDepthOfFieldFilter;
+    EDLFilter@ mEDLFilter;
+    
     Node@ mCurEffectNode;
 
     Array<DrawEffectDesc@> mEffectDescList;
@@ -320,6 +326,9 @@ class EditorSelectEffect
         viewport.AddFilter(mHDRFilter);
         mHDRFilter.enable = false;
 
+        mAfterHDRANDBloomFilter = AfterHDRANDBloomFilter(viewport);
+        viewport.AddFilter(mAfterHDRANDBloomFilter);
+    
         mOutlineFilter = OutlineFilter(viewport);
         viewport.AddFilter(mOutlineFilter);
 
@@ -332,10 +341,24 @@ class EditorSelectEffect
         mVolumeInfluenceFilter = VolumeInfluenceFilter(viewport);
         viewport.AddFilter(mVolumeInfluenceFilter);
 
+        mTranslucentAfterHDRFilter = TranslucentAfterHDRFilter(viewport);
+        viewport.AddFilter(mTranslucentAfterHDRFilter);
+
+        mDepthOfFieldFilter = DepthOfFieldFilter(viewport);
+        viewport.AddFilter(mDepthOfFieldFilter);
+        mDepthOfFieldFilter.enable = false;
 
         mSMAAFilter = SMAAFilter(viewport);
         viewport.AddFilter(mSMAAFilter);
         mSMAAFilter.enable = false;
+
+        mTemporalAAFilter = TemporalAAFilter(viewport);
+        viewport.AddFilter(mTemporalAAFilter);
+        mTemporalAAFilter.enable = false;
+
+        mEDLFilter = EDLFilter(viewport);
+        viewport.AddFilter(mEDLFilter);
+        mEDLFilter.enable = false;
 
         InitEffectDescList();
 
@@ -435,7 +458,7 @@ class EditorSelectEffect
     ///穿透显示
         mEffectDescList.Push(DrawEffectDesc("穿透显示", DrawEffectFunc(this.SetTranslucent), CancelEffectFunc(this.CancelTranslucent), Variant(Color(1,0.5,0))));
     ///发光效果
-        mEffectDescList.Push(DrawEffectDesc("泛光(Bloom)", DrawEffectFunc(this.SetBloom), CancelEffectFunc(this.CancelBloom),Variant(Color(1,0.5,0))));
+        mEffectDescList.Push(DrawEffectDesc("泛光(Bloom)", DrawEffectFunc(this.SetBloom), CancelEffectFunc(this.CancelBloom),Variant(Color(10,5,0))));
     ///设置闪烁效果
     {
         VariantMap map;
@@ -449,8 +472,34 @@ class EditorSelectEffect
 
     ///SMAA 抗锯齿
         mDefferDescList.Push(DrawEffectDesc("抗锯齿(SMAA)", DrawEffectFunc(this.OpenSMAAEffect), CancelEffectFunc(this.CloseSMAAEffect), Variant(), true));
+    ///SMAA 抗锯齿
+        mDefferDescList.Push(DrawEffectDesc("抗锯齿(TAA)", DrawEffectFunc(this.OpenTemporalAAFilter), CancelEffectFunc(this.CloseTemporalAAFilter)));
     ///环境遮蔽
-        mDefferDescList.Push(DrawEffectDesc("环境遮蔽(AO)", DrawEffectFunc(this.OpenDeferredHBAOEffect), CancelEffectFunc(this.CloseDeferredHBAOEffect)));
+    {
+        VariantMap map;
+        map["Arg1"]     = float(0.7);
+        map["ArgName1"] = "AO强度:";
+        
+        map["Arg2"]     = float(2.0);
+        map["ArgName2"] = "AO半径:";
+        
+        map["Arg3"]     = float(8.0);
+        map["ArgName3"] = "圆周采样:";
+                
+        map["Arg4"]     = float(4.0);
+        map["ArgName4"] = "径向采样:";
+        
+        map["Arg5"]     = float(1.0);
+        map["ArgName5"] = "AO衰减:";
+        
+        map["Arg6"]     = float(30);
+        map["ArgName6"] = "AO阈值°:";
+        
+        map["Arg7"]     = float(4.0);
+        map["ArgName7"] = "滤波半径:";
+
+        mDefferDescList.Push(DrawEffectDesc("环境遮蔽(AO)", DrawEffectFunc(this.OpenDeferredHBAOEffect), CancelEffectFunc(this.CloseDeferredHBAOEffect), Variant(map)));
+    }
     ///高动态范围
         mDefferDescList.Push(DrawEffectDesc("高动态范围(HDR)", DrawEffectFunc(this.OpenHDREffect), CancelEffectFunc(this.CloseHDREffect), Variant() , true));
     ///乏光+高动态范围
@@ -460,6 +509,24 @@ class EditorSelectEffect
         map["ArgName1"] = "阀值:";
         mDefferDescList.Push(DrawEffectDesc("泛光+高动态范围(BloomHDR)", DrawEffectFunc(this.OpenBloomHDREffect), CancelEffectFunc(this.CloseBloomHDREffect), Variant(map), true));
     }
+    ///景深
+    {
+        VariantMap map;
+        map["Arg1"]     = float(6);
+        map["ArgName1"] = "闪光圈max:";
+        
+        map["Arg2"]     = float(30);
+        map["ArgName2"] = "成像距离:";
+        
+        map["Arg3"]     = float(0.1);
+        map["ArgName3"] = "焦距:";
+        
+        map["Arg4"]     = float(1.4);
+        map["ArgName4"] = "光圈:";
+
+        mDefferDescList.Push(DrawEffectDesc("景深", DrawEffectFunc(this.OpenDepthOfFieldFilter), CancelEffectFunc(this.CloseDepthOfFieldFilter), Variant(map)));
+    }
+
     ///镜头光晕
         mDefferDescList.Push(DrawEffectDesc("镜头光晕(LensFlare)", DrawEffectFunc(this.OpenLensFlareffect), CancelEffectFunc(this.CloseLensFlareEffect)));
     ///下雨
@@ -468,11 +535,34 @@ class EditorSelectEffect
         mDefferDescList.Push(DrawEffectDesc("下雪", DrawEffectFunc(this.OpenSnowEffect), CancelEffectFunc(this.CloseSnowEffect)));
     ///静态阴影
         mDefferDescList.Push(DrawEffectDesc("静态阴影", DrawEffectFunc(this.OpenStaticShadow), CancelEffectFunc(this.CloseStaticShadow), Variant(), true));
+    ///EDL
+    {
+        VariantMap map;
+        map["Arg1"]     = float(1);
+        map["ArgName1"] = "范围:";
+        
+        map["Arg2"]     = float(300);
+        map["ArgName2"] = "增益:";
+        mDefferDescList.Push(DrawEffectDesc("点云(EDL)", DrawEffectFunc(this.OpenEDLFilter), CancelEffectFunc(this.CloseEDLFilter), Variant(map)));
+    }
+
+    ///LogDepth
+        mDefferDescList.Push(DrawEffectDesc("LogDepth", DrawEffectFunc(this.OpenLogDepth), CancelEffectFunc(this.CloseLogDepth), Variant(), true));
     }
 
 ///AO
     void OpenDeferredHBAOEffect(Variant& var)
     {
+        VariantMap map = var.GetVariantMap();
+
+        mDeferredHBAOFilter.SetHBAOIntensity(map["Arg1"].GetFloat());
+        mDeferredHBAOFilter.SetAORadius(map["Arg2"].GetFloat());
+        mDeferredHBAOFilter.SetAONumDir(map["Arg3"].GetFloat());
+        mDeferredHBAOFilter.SetAONumSteps(map["Arg4"].GetFloat());
+        mDeferredHBAOFilter.SetAOAttenuation(map["Arg5"].GetFloat());
+        mDeferredHBAOFilter.SetAOAngleBias(map["Arg6"].GetFloat());
+        mDeferredHBAOFilter.SetBilateralBlurRadius(map["Arg7"].GetFloat());
+
         mDeferredHBAOFilter.enable = true;
     }
 
@@ -516,6 +606,22 @@ class EditorSelectEffect
         mLensFlareFilter.SetEnable(false);
     }
 
+///DepthOfFieldFilter
+    void OpenDepthOfFieldFilter(Variant& var)
+    {
+        VariantMap map = var.GetVariantMap();
+        mDepthOfFieldFilter.SetMaxCoc(map["Arg1"].GetFloat());
+        mDepthOfFieldFilter.SetFocusDistance(map["Arg2"].GetFloat());
+        mDepthOfFieldFilter.SetFocalLength(map["Arg3"].GetFloat());
+        mDepthOfFieldFilter.SetFNumber(map["Arg4"].GetFloat());
+        mDepthOfFieldFilter.enable = true;
+    }
+
+    void CloseDepthOfFieldFilter()
+    {
+        mDepthOfFieldFilter.enable = false;
+    }
+
 ///SMAA
     void OpenSMAAEffect(Variant& var)
     {
@@ -525,6 +631,42 @@ class EditorSelectEffect
     void CloseSMAAEffect()
     {
         mSMAAFilter.enable = false;
+    }
+
+///TAA
+    void OpenTemporalAAFilter(Variant& var)
+    {
+        mTemporalAAFilter.enable = true;
+    }
+
+    void CloseTemporalAAFilter()
+    {
+        mTemporalAAFilter.enable = false;
+    }
+
+///EDL
+    void OpenEDLFilter(Variant& var)
+    {
+        VariantMap map = var.GetVariantMap();
+        mEDLFilter.SetPixScale(map["Arg1"].GetFloat());
+        mEDLFilter.SetExpScale(map["Arg2"].GetFloat());
+        mEDLFilter.enable = true;
+    }
+
+    void CloseEDLFilter()
+    {
+        mEDLFilter.enable = false;
+    }
+
+///LogDepth
+    void OpenLogDepth(Variant& var)
+    {
+        renderer.ableLogDepth = true;
+    }
+
+    void CloseLogDepth()
+    {
+        renderer.ableLogDepth = false;
     }
 
     void AddCameraLookAtNodeToScene()

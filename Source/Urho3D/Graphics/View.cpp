@@ -803,7 +803,7 @@ void View::GetDrawables()
 	if(enableStaticShadow_&&updateStaticShadow_)
     {
 		AllCastersQuery
-			query(allStaticCasters_, DynamicType::Static, DRAWABLE_GEOMETRY | DRAWABLE_ZONE, cullCamera_->GetViewMask());
+			query(allStaticCasters_, DynamicType::Static, DRAWABLE_GEOMETRY , cullCamera_->GetViewMask());
 		octree_->GetDrawables(query);
     }
 
@@ -1278,16 +1278,13 @@ void View::GetBaseBatches()
             // Check each of the scene passes
             for (unsigned k = 0; k < scenePasses_.Size(); ++k)
             {
-                ScenePassInfo& info = scenePasses_[k];
+                const ScenePassInfo& info = scenePasses_[k];
                 // Skip forward base pass if the corresponding litbase pass already exists
                 if (info.passIndex_ == basePassIndex_ && j < 32 && drawable->HasBasePass(j))
                     continue;
 
-				Pass* pass;
-				if (drawable->GetPass(info.passName_))
-				{
-					pass = drawable->GetPass(info.passName_);
-				}else
+				Pass* pass = drawable->GetPass(info.passName_);
+				if (!pass)
 				{
 					pass = tech->GetSupportedPass(info.passIndex_);
 				}
@@ -2790,33 +2787,29 @@ void View::SetupDirLightStaticShadowCamera(Camera* shadowCamera, Light* light, f
 {
 	Node* shadowCameraNode = shadowCamera->GetNode();
 	Node* lightNode = light->GetNode();
-	Polyhedron frustumVolume;
+	BoundingBox shadowBox;
 	shadowCameraNode->SetTransform(Vector3(0,0,0), lightNode->GetWorldRotation());
 	{
-		BoundingBox litGeometriesBox;
 		unsigned lightMask = light->GetLightMask();
 
 		for (unsigned i = 0; i < allStaticCasters_.Size(); ++i)
 		{
 			Drawable* drawable = allStaticCasters_[i];
-			litGeometriesBox.Merge(drawable->GetWorldBoundingBox());
+			shadowBox.Merge(drawable->GetWorldBoundingBox());
 		}
-
-		frustumVolume.Define(litGeometriesBox);
 	}
 	// Transform frustum volume to light space
 	const Matrix3x4& lightView = shadowCamera->GetView();
-	frustumVolume.Transform(lightView);
+	shadowBox.Transform(lightView);
 
 	// Fit the frustum volume inside a bounding box. If uniform size, use a sphere instead
-	BoundingBox shadowBox;
-	shadowBox.Define(frustumVolume);
 
 	shadowCamera->SetOrthographic(true);
 	shadowCamera->SetAspectRatio(1.0f);
 	shadowCamera->SetNearClip(0);
 	shadowCamera->SetFarClip(shadowBox.max_.z_ - shadowBox.min_.z_);
-	Vector3 cameraPosView((shadowBox.max_.x_ + shadowBox.min_.x_) / 2, (shadowBox.max_.y_ + shadowBox.min_.y_) / 2, shadowBox.min_.z_);
+	//Vector3 cameraPosView((shadowBox.max_.x_ + shadowBox.min_.x_) / 2, (shadowBox.max_.y_ + shadowBox.min_.y_) / 2, shadowBox.min_.z_);
+	Vector3 cameraPosView(0, 0, shadowBox.min_.z_);
 	cameraPosView = lightView.Inverse()*cameraPosView;
 	
 	// Calculate initial position & rotation
@@ -3033,6 +3026,16 @@ void View::SetQueueShaderDefines(BatchQueue& queue, const RenderPathCommand& com
 {
     String vsDefines = command.vertexShaderDefines_.Trimmed();
     String psDefines = command.pixelShaderDefines_.Trimmed();
+	if (renderer_->IsUsingLogDepth())
+	{
+		vsDefines += " LOGDEPTH ";
+		psDefines += " LOGDEPTH ";
+	}
+	else
+	{
+		vsDefines += " ";
+		psDefines += " ";
+	}
     if (vsDefines.Length() || psDefines.Length())
     {
         queue.hasExtraDefines_ = true;

@@ -142,7 +142,7 @@ void CalculateDirectionalLightStaticShadowMatrix(Matrix4& dest, LightBatchQueue*
 	Matrix4 shadowProj(shadowCamera->GetGPUProjection());
 	Matrix4 texAdjust(Matrix4::IDENTITY);
 
-	Texture2D* shadowMap = queue->shadowMap_;
+	Texture2D* shadowMap = queue->staticShadowMap_;
 	if (!shadowMap)
 		return;
 
@@ -364,7 +364,7 @@ void Batch::Prepare(View* view, Camera* camera, bool setModelTransform, bool all
         }
 
         graphics->SetShaderParameter(PSP_FOGPARAMS, fogParams);
-		//graphics->SetShaderParameter(PSP_ISFOGGING, zone_->IsFogging());
+		graphics->SetShaderParameter(PSP_ISFOGGING, zone_->IsFogging());
     }
 
     // Set light-related shader parameters

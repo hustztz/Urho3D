@@ -16,6 +16,8 @@
 #include "Graphics/Effects/DayNightWeatherControl.h"
 #include "Filter/LensFlareFilter.h"
 #include "Filter/AfterHDRAndBloomFilter.h"
+#include "Filter/TemporalAAFilter.h"
+#include "Filter/EDLFilter.h"
 
 namespace Urho3D
 {
@@ -62,6 +64,31 @@ namespace Urho3D
 		engine->RegisterObjectBehaviour("SMAAFilter", asBEHAVE_FACTORY, "SMAAFilter@+ f(Viewport@+ )", asFUNCTION(ConstructSMAAFilter), asCALL_CDECL);
 	}
 
+	static TemporalAAFilter* ConstructTemporalAAFilter(Viewport* viewPort)
+	{
+		return new TemporalAAFilter(GetScriptContext(), viewPort);
+	}
+
+	static void RegisterTemporalAAFilter(asIScriptEngine* engine)
+	{
+		RegisterFilterBaseAPI<TemporalAAFilter>(engine, "TemporalAAFilter");
+		engine->RegisterObjectBehaviour("TemporalAAFilter", asBEHAVE_FACTORY, "TemporalAAFilter@+ f(Viewport@+ )", asFUNCTION(ConstructTemporalAAFilter), asCALL_CDECL);
+	}
+
+	static EDLFilter* ConstructEDLFilter(Viewport* viewPort)
+	{
+		return new EDLFilter(GetScriptContext(), viewPort);
+	}
+
+	static void RegisterEDLFilter(asIScriptEngine* engine)
+	{
+		RegisterFilterBaseAPI<EDLFilter>(engine, "EDLFilter");
+		engine->RegisterObjectBehaviour("EDLFilter", asBEHAVE_FACTORY, "EDLFilter@+ f(Viewport@+ )", asFUNCTION(ConstructEDLFilter), asCALL_CDECL);
+		engine->RegisterObjectMethod("EDLFilter", "void SetPixScale(float)", asMETHOD(EDLFilter, SetPixScale), asCALL_THISCALL);
+		engine->RegisterObjectMethod("EDLFilter", "void SetExpScale(float)", asMETHOD(EDLFilter, SetExpScale), asCALL_THISCALL);
+	}
+
+	
 	static UnshadedColorFilter* ConstructUnshadedColorFilter(Viewport* viewPort)
 	{
 		return new UnshadedColorFilter(GetScriptContext(), viewPort);
@@ -279,12 +306,14 @@ namespace Urho3D
 
 		RegisterOutlineFilter(engine);
 		RegisterSMAAFilter(engine);
+		RegisterTemporalAAFilter(engine);
 		RegisterUnshadedColorFilter(engine);
 		RegisterTranslucentFilter(engine);
 		RegisterHDRFilter(engine);
 		RegisterBloomHDRFilter(engine);
 		RegisterLensFlareFilter(engine);
 		RegisterAfterHDRANDBloomFilter(engine);
+		RegisterEDLFilter(engine);
 
 		RegisterOuterElecEffectFilter(engine);
 		RegisterVolumeInfluenceFilter(engine);

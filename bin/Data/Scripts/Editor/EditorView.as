@@ -466,7 +466,7 @@ Color gridYColor(0.5, 0.5, 0.5);
 Color gridZColor(0.5, 0.5, 0.5);
 
 Array<int> pickModeDrawableFlags = {
-    DRAWABLE_GEOMETRY,
+    DRAWABLE_GEOMETRY|DRAWABLE_POINTCLOUD,
     DRAWABLE_LIGHT,
     DRAWABLE_ZONE
 };
@@ -2424,13 +2424,22 @@ void ViewRaycast(bool mouseClick)
     {
         if (editorScene.octree is null)
             return;
-        RayQueryResult result = editorScene.octree.RaycastSingle(cameraRay, RAY_TRIANGLE, camera.farClip,
-            pickModeDrawableFlags[pickMode], 0x7fffffff);
+        RayQueryResult result = editorScene.octree.RaycastSingle(cameraRay, RAY_TRIANGLE, camera.farClip, pickModeDrawableFlags[pickMode], 0x7fffffff);
+        
 
         if (result.drawable !is null)
         {
             Drawable@ drawable = result.drawable;
-
+            AgPointCloudContainer@ pointCloud = cast<AgPointCloudContainer@>(drawable);           
+            if(pointCloud !is null)
+            {
+                gPointCloudPick.position = result.position;
+                gPointCloudPickbd.SetVisible(true);
+            }
+            else
+            {
+                gPointCloudPickbd.SetVisible(false);
+            }
             // for actual last selected node or component in both modes
             if (hotKeyMode == HOTKEYS_MODE_STANDARD)
             {
@@ -2474,6 +2483,10 @@ void ViewRaycast(bool mouseClick)
                     terrainEditor.targetColorSelected = false;
                 }
             }
+        }
+        else
+        {
+            gPointCloudPickbd.SetVisible(false);
         }
     }
     else

@@ -61,6 +61,7 @@ void StaticModel::RegisterObject(Context* context)
     URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Model", GetModelAttr, SetModelAttr, ResourceRef, ResourceRef(Model::GetTypeStatic()), AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Material", GetMaterialsAttr, SetMaterialsAttr, ResourceRefList, ResourceRefList(Material::GetTypeStatic()),
         AM_DEFAULT);
+	URHO3D_MIXED_ACCESSOR_ATTRIBUTE("BIHTree", GetBIHTreeAttr, SetBIHTreeAttr, ResourceRef, ResourceRef(Tree::GetTypeStatic()), AM_DEFAULT);
     URHO3D_ATTRIBUTE("Is Occluder", bool, occluder_, false, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Can Be Occluded", IsOccludee, SetOccludee, bool, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Cast Shadows", bool, castShadows_, false, AM_DEFAULT);
@@ -97,7 +98,36 @@ void StaticModel::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQuer
 
             for (unsigned i = 0; i < batches_.Size(); ++i)
             {
-                Geometry* geometry = batches_[i].geometry_;
+				if (!tree_)
+				{
+					tree_ = new Tree(context_);
+				}
+				int resultCount = batches_[i].createCollisionData(localRay, boundingBox_, results, tree_->GetBIHTrees());
+				URHO3D_LOGDEBUG(String("resultCount= ") + resultCount);
+				if (resultCount > 0)
+				{
+					int index = 1;
+					for (PODVector<RayQueryResult>::Iterator j = results.Begin(); j != results.End(); ++j)
+					{
+						RayQueryResult& result = *j;
+						result.position_ = query.ray_.origin_ + result.distance_ * query.ray_.direction_;
+						result.drawable_ = this;
+						result.node_ = node_;
+						URHO3D_LOGDEBUG(String("index_= ") + (index));
+						URHO3D_LOGDEBUG(String("result.distance_= ") + (result.distance_));
+						URHO3D_LOGDEBUG(String("query.ray_.origin_.x_= ") + (query.ray_.origin_.x_));
+						URHO3D_LOGDEBUG(String("query.ray_.origin_.y_= ") + (query.ray_.origin_.y_));
+						URHO3D_LOGDEBUG(String("query.ray_.origin_.z_= ") + (query.ray_.origin_.z_));
+						URHO3D_LOGDEBUG(String("query.ray_.direction_.x_= ") + (query.ray_.direction_.x_));
+						URHO3D_LOGDEBUG(String("query.ray_.direction_.y_= ") + (query.ray_.direction_.y_));
+						URHO3D_LOGDEBUG(String("query.ray_.direction_.z_= ") + (query.ray_.direction_.z_));
+						URHO3D_LOGDEBUG(String("result.position_.x_= ") + (result.position_.x_));
+						URHO3D_LOGDEBUG(String("result.position_.y_= ") + (result.position_.y_));
+						URHO3D_LOGDEBUG(String("result.position_.z_= ") + (result.position_.z_));
+						index++;
+					}
+				}
+              /*  Geometry* geometry = batches_[i].geometry_;
                 if (geometry)
                 {
                     Vector3 geometryNormal;
@@ -109,11 +139,11 @@ void StaticModel::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQuer
                         normal = (node_->GetWorldTransform() * Vector4(geometryNormal, 0.0f)).Normalized();
                         hitBatch = i;
                     }
-                }
+                }*/
             }
         }
 
-        if (distance < query.maxDistance_)
+       /* if (distance < query.maxDistance_)
         {
             RayQueryResult result;
             result.position_ = query.ray_.origin_ + distance * query.ray_.direction_;
@@ -124,7 +154,7 @@ void StaticModel::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQuer
             result.node_ = node_;
             result.subObject_ = hitBatch;
             results.Push(result);
-        }
+        }*/
         break;
     }
 }
@@ -395,6 +425,53 @@ const ResourceRefList& StaticModel::GetMaterialsAttr() const
         materialsAttr_.names_[i] = GetResourceName(GetMaterial(i));
 
     return materialsAttr_;
+}
+
+/// Set bihTree on all geometries.
+void StaticModel::SetBIHTree(Tree* tree)
+{
+	
+	tree_ = tree;
+	if (tree_ != nullptr)
+	{
+		Vector<SharedPtr<BIHTree> > treeInfo = tree_->GetBIHTrees();
+		for (unsigned i = 0; i < treeInfo.Size(); ++i)
+		{
+			batches_[i].tree_ = treeInfo[i];
+		}
+	}
+
+	MarkNetworkUpdate();
+}
+
+/// Set bihTree on one geometry. Return true if successful.
+bool StaticModel::SetBIHTree(unsigned index, BIHTree* bihTree)
+{
+	if (index >= batches_.Size())
+	{
+		URHO3D_LOGERROR("tree index out of bounds");
+		return false;
+	}
+
+	batches_[index].tree_ = bihTree;
+	MarkNetworkUpdate();
+	return true;
+}
+
+BIHTree* StaticModel::GetBIHTree(unsigned index) const
+{
+	return index < batches_.Size() ? batches_[index].tree_ : nullptr;
+}
+
+void StaticModel::SetBIHTreeAttr(const ResourceRef& value)
+{
+	auto* cache = GetSubsystem<ResourceCache>();
+	tree_ = cache->GetResource<Tree>(value.name_);
+}
+
+ResourceRef StaticModel::GetBIHTreeAttr() const
+{
+	return GetResourceRef(tree_, Tree::GetTypeStatic());
 }
 
 void StaticModel::OnWorldBoundingBoxUpdate()

@@ -32,13 +32,22 @@
 #include <Urho3D/Input/Input.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Scene/Scene.h>
+#include <Urho3D/Filter/EDLFilter.h>
 #include <Urho3D/UI/Font.h>
 #include <Urho3D/UI/Text.h>
 #include <Urho3D/UI/UI.h>
 
+#include <Urho3D/PointCloud/AgPointCloudOptions.h>
+
 #include "StaticScene.h"
 
 #include <Urho3D/DebugNew.h>
+
+#include <vector>
+#include <string>
+#include <io.h>
+
+using namespace ambergris::PointCloudEngine;
 
 URHO3D_DEFINE_APPLICATION_MAIN(StaticScene)
 
@@ -68,34 +77,62 @@ void StaticScene::Start()
     Sample::InitMouseMode(MM_RELATIVE);
 }
 
+void getAllFiles(std::string path, std::vector<std::string>& files, std::string fileType)
+{
+	// 文件句柄
+	intptr_t hFile = 0;
+	// 文件信息
+	struct _finddata_t fileinfo;
+
+	std::string p;
+
+	if ((hFile = _findfirst(p.assign(path).append("\\*" + fileType).c_str(), &fileinfo)) != -1) {
+		do {
+			// 保存文件的全路径
+			files.push_back((fileinfo.name));
+
+		} while (_findnext(hFile, &fileinfo) == 0); //寻找下一个，成功返回0，否则-1
+
+		_findclose(hFile);
+	}
+}
+
 void StaticScene::CreateScene()
 {
     auto* cache = GetSubsystem<ResourceCache>();
 
     scene_ = new Scene(context_);
 
-    // Create the Octree component to the scene. This is required before adding any drawable components, or else nothing will
-    // show up. The default octree volume will be from (-1000, -1000, -1000) to (1000, 1000, 1000) in world coordinates; it
-    // is also legal to place objects outside the volume but their visibility can then not be checked in a hierarchically
-    // optimizing manner
-    scene_->CreateComponent<Octree>();
+	AgPointCloudOptions* pointCloudOptions = scene_->CreateComponent<AgPointCloudOptions>();
+
+	// Create the Octree component to the scene. This is required before adding any drawable components, or else nothing will
+	// show up. The default octree volume will be from (-1000, -1000, -1000) to (1000, 1000, 1000) in world coordinates; it
+	// is also legal to place objects outside the volume but their visibility can then not be checked in a hierarchically
+	// optimizing manner
+	scene_->CreateComponent<Octree>();
+
+	Node* pointCloudNode = scene_->CreateChild("PointCloud");
+	SharedPtr<File> file = cache->GetFile("G:\\Data\\PointCloud\\zongheng\\las\\sdsd.xml");
+	SharedPtr<XMLFile> xml(new XMLFile(context_));
+	if (xml->Load(*file))
+		pointCloudNode->LoadXML(xml->GetRoot());
+
+	// Create a directional light to the world so that we can see something. The light scene node's orientation controls the
+	// light direction; we will use the SetDirection() function which calculates the orientation from a forward direction vector.
+	// The light will use default settings (white light, no shadows)
+	Node* lightNode = scene_->CreateChild("DirectionalLight");
+	lightNode->SetDirection(Vector3(0.6f, -1.0f, 0.8f)); // The direction vector does not need to be normalized
+	auto* light = lightNode->CreateComponent<Light>();
+	light->SetLightType(LIGHT_DIRECTIONAL);
 
     // Create a child scene node (at world origin) and a StaticModel component into it. Set the StaticModel to show a simple
     // plane mesh with a "stone" material. Note that naming the scene nodes is optional. Scale the scene node larger
     // (100 x 100 world units)
-    Node* planeNode = scene_->CreateChild("Plane");
+    /*Node* planeNode = scene_->CreateChild("Plane");
     planeNode->SetScale(Vector3(100.0f, 1.0f, 100.0f));
     auto* planeObject = planeNode->CreateComponent<StaticModel>();
     planeObject->SetModel(cache->GetResource<Model>("Models/Plane.mdl"));
-    planeObject->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));
-
-    // Create a directional light to the world so that we can see something. The light scene node's orientation controls the
-    // light direction; we will use the SetDirection() function which calculates the orientation from a forward direction vector.
-    // The light will use default settings (white light, no shadows)
-    Node* lightNode = scene_->CreateChild("DirectionalLight");
-    lightNode->SetDirection(Vector3(0.6f, -1.0f, 0.8f)); // The direction vector does not need to be normalized
-    auto* light = lightNode->CreateComponent<Light>();
-    light->SetLightType(LIGHT_DIRECTIONAL);
+    planeObject->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));*/
 
     // Create more StaticModel objects to the scene, randomly positioned, rotated and scaled. For rotation, we construct a
     // quaternion from Euler angles where the Y angle (rotation about the Y axis) is randomized. The mushroom model contains
@@ -103,17 +140,34 @@ void StaticScene::CreateScene()
     // see the model get simpler as it moves further away). Finally, rendering a large number of the same object with the
     // same material allows instancing to be used, if the GPU supports it. This reduces the amount of CPU work in rendering the
     // scene.
-    const unsigned NUM_OBJECTS = 200;
-    for (unsigned i = 0; i < NUM_OBJECTS; ++i)
-    {
-        Node* mushroomNode = scene_->CreateChild("Mushroom");
-        mushroomNode->SetPosition(Vector3(Random(90.0f) - 45.0f, 0.0f, Random(90.0f) - 45.0f));
-        mushroomNode->SetRotation(Quaternion(0.0f, Random(360.0f), 0.0f));
-        mushroomNode->SetScale(0.5f + Random(2.0f));
-        auto* mushroomObject = mushroomNode->CreateComponent<StaticModel>();
-        mushroomObject->SetModel(cache->GetResource<Model>("Models/Mushroom.mdl"));
-        mushroomObject->SetMaterial(cache->GetResource<Material>("Materials/Mushroom.xml"));
-    }
+	//const unsigned NUM_OBJECTS = 2000;
+	//std::vector<std::string> temp;
+	//getAllFiles("G:\\Data\\sceneData\\jinhua_obj", temp, ".xml");
+	//cache->AddResourceDir("G:\\Data\\sceneData\\jinhua_obj");
+
+	//for (unsigned i = 0; i < 20/*temp.size()*/; i++)
+	//{
+	//	Node* mushroomNode = scene_->CreateChild("Mushroom");
+	//	/*mushroomNode->SetPosition(Vector3(Random(90.0f) - 45.0f, 0.0f, Random(90.0f) - 45.0f));
+	//	mushroomNode->SetRotation(Quaternion(0.0f, Random(360.0f), 0.0f));
+	//	mushroomNode->SetScale(0.5f + Random(2.0f));
+	//	auto* mushroomObject = mushroomNode->CreateComponent<StaticModel>();
+	//	mushroomObject->SetModel(cache->GetResource<Model>("Models/Mushroom.mdl"));
+	//	mushroomObject->SetMaterial(cache->GetResource<Material>("Materials/Mushroom.xml"));*/
+
+	//	SharedPtr<File> file = cache->GetFile(temp[i].c_str());
+	//	SharedPtr<XMLFile> xml(new XMLFile(context_));
+	//	if (!xml->Load(*file))
+	//		continue;;
+
+	//	mushroomNode->LoadXML(xml->GetRoot());
+	//	/*const Node* child = mushroomNode->GetChild(0u);
+	//	StaticModel* model = child->GetComponent<StaticModel>();*/
+	//	const Node* child = mushroomNode->GetChild(0u);
+	//	StaticModel* model = child->GetComponent<StaticModel>();
+	//	model->SetCastShadows(true);
+
+	//}
 
     // Create a scene node for the camera, which we will move around
     // The camera will use default settings (1000 far clip distance, 45 degrees FOV, set aspect ratio automatically)
@@ -128,6 +182,16 @@ void StaticScene::CreateInstructions()
 {
     auto* cache = GetSubsystem<ResourceCache>();
     auto* ui = GetSubsystem<UI>();
+
+	// Create a Cursor UI element because we want to be able to hide and show it at will. When hidden, the mouse cursor will
+	// control the camera, and when visible, it will point the raycast target
+	auto* style = cache->GetResource<XMLFile>("UI/DefaultStyle.xml");
+	SharedPtr<Cursor> cursor(new Cursor(context_));
+	cursor->SetStyleAuto(style);
+	ui->SetCursor(cursor);
+	// Set starting position of the cursor at the rendering window center
+	auto* graphics = GetSubsystem<Graphics>();
+	cursor->SetPosition(graphics->GetWidth() / 2, graphics->GetHeight() / 2);
 
     // Construct new Text object, set string to display and font to use
     auto* instructionText = ui->GetRoot()->CreateChild<Text>();
@@ -149,18 +213,22 @@ void StaticScene::SetupViewport()
     // use, but now we just use full screen and default render path configured in the engine command line options
     SharedPtr<Viewport> viewport(new Viewport(context_, scene_, cameraNode_->GetComponent<Camera>()));
     renderer->SetViewport(0, viewport);
+	SharedPtr<EDLFilter> edlFilter(new EDLFilter(context_, viewport));
+	viewport->AddFilter(edlFilter);
 }
 
 void StaticScene::MoveCamera(float timeStep)
 {
+	auto* ui = GetSubsystem<UI>();
+	auto* input = GetSubsystem<Input>();
+	ui->GetCursor()->SetVisible(!input->GetMouseButtonDown(MOUSEB_RIGHT));
+
     // Do not move if the UI has a focused element (the console)
-    if (GetSubsystem<UI>()->GetFocusElement())
+    if (ui->GetFocusElement())
         return;
 
-    auto* input = GetSubsystem<Input>();
-
     // Movement speed as world units per second
-    const float MOVE_SPEED = 20.0f;
+    const float MOVE_SPEED = 40.0f;
     // Mouse sensitivity as degrees per pixel
     const float MOUSE_SENSITIVITY = 0.1f;
 
@@ -183,6 +251,50 @@ void StaticScene::MoveCamera(float timeStep)
         cameraNode_->Translate(Vector3::LEFT * MOVE_SPEED * timeStep);
     if (input->GetKeyDown(KEY_D))
         cameraNode_->Translate(Vector3::RIGHT * MOVE_SPEED * timeStep);
+
+	// Paint decal with the left mousebutton; cursor must be visible
+	if (ui->GetCursor()->IsVisible() && input->GetMouseButtonPress(MOUSEB_LEFT))
+		Pickup();
+}
+
+void StaticScene::Pickup()
+{
+	Vector3 hitPos;
+	Drawable* hitDrawable;
+
+	if (Raycast(250.0f, hitPos, hitDrawable))
+	{
+		// Check if target scene node already has a DecalSet component. If not, create now
+		Node* targetNode = hitDrawable->GetNode();
+	}
+}
+
+bool StaticScene::Raycast(float maxDistance, Vector3& hitPos, Drawable*& hitDrawable)
+{
+	hitDrawable = nullptr;
+
+	auto* ui = GetSubsystem<UI>();
+	IntVector2 pos = ui->GetCursorPosition();
+	// Check the cursor is visible and there is no UI element in front of the cursor
+	if (!ui->GetCursor()->IsVisible() || ui->GetElementAt(pos, true))
+		return false;
+
+	auto* graphics = GetSubsystem<Graphics>();
+	auto* camera = cameraNode_->GetComponent<Camera>();
+	Ray cameraRay = camera->GetScreenRay((float)pos.x_ / graphics->GetWidth(), (float)pos.y_ / graphics->GetHeight());
+	// Pick only geometry objects, not eg. zones or lights, only get the first (closest) hit
+	PODVector<RayQueryResult> results;
+	RayOctreeQuery query(results, cameraRay, RAY_TRIANGLE, maxDistance, DRAWABLE_GEOMETRY | DRAWABLE_POINTCLOUD);
+	scene_->GetComponent<Octree>()->RaycastSingle(query);
+	if (results.Size())
+	{
+		RayQueryResult& result = results[0];
+		hitPos = result.position_;
+		hitDrawable = result.drawable_;
+		return true;
+	}
+
+	return false;
 }
 
 void StaticScene::SubscribeToEvents()
@@ -200,4 +312,14 @@ void StaticScene::HandleUpdate(StringHash eventType, VariantMap& eventData)
 
     // Move the camera, scale movement with time step
     MoveCamera(timeStep);
+
+	const Vector<SharedPtr<Node> >& nodes = scene_->GetChildren();
+	for (unsigned i = 0; i < nodes.Size(); ++i)
+	{
+		Node* pNode = nodes[i];
+		StaticModel* model = pNode->GetComponent<StaticModel>();
+		if (model)
+			model->SetCastShadows(true);
+	}
+
 }

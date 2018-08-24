@@ -61,4 +61,8 @@ private:
     void SubscribeToEvents();
     /// Handle the logic update event.
     void HandleUpdate(StringHash eventType, VariantMap& eventData);
+	/// Paint a decal using a ray cast from the mouse cursor.
+	void Pickup();
+	/// Utility function to raycast to the cursor position. Return true if hit
+	bool Raycast(float maxDistance, Vector3& hitPos, Drawable*& hitDrawable);
 };

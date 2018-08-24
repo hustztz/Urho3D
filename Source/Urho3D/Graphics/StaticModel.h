@@ -101,6 +101,19 @@ public:
     /// Return materials attribute.
     const ResourceRefList& GetMaterialsAttr() const;
 
+	/// Set bihTree on all geometries.
+	virtual void SetBIHTree(Tree* bihTree);
+	/// Set bihTree on one geometry. Return true if successful.
+	virtual bool SetBIHTree(unsigned index, BIHTree* bihTree);
+	/// Return BIHTree from the first geometry, assuming all the geometries use the same BIHTree.
+	virtual BIHTree* GetBIHTree() const { return GetBIHTree(0); }
+	/// Return BIHTree by geometry index.
+	virtual BIHTree* GetBIHTree(unsigned index) const;
+	/// Set BIHTree attribute.
+	void SetBIHTreeAttr(const ResourceRef& value);
+	/// Return BIHTree attribute.
+	ResourceRef GetBIHTreeAttr() const;
+
 protected:
     /// Recalculate the world-space bounding box.
     void OnWorldBoundingBoxUpdate() override;
@@ -111,7 +124,7 @@ protected:
     /// Reset LOD levels.
     void ResetLodLevels();
     /// Choose LOD levels based on distance.
-    void CalculateLodLevels();
+	virtual void CalculateLodLevels();
 
     /// Extra per-geometry data.
     PODVector<StaticModelGeometryData> geometryData_;
@@ -123,6 +136,8 @@ protected:
     unsigned occlusionLodLevel_;
     /// Material list attribute.
     mutable ResourceRefList materialsAttr_;
+	/// Tree.
+	SharedPtr<Tree> tree_;
 
 private:
     /// Handle model reload finished.

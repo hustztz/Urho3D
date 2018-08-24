@@ -84,6 +84,24 @@ namespace Urho3D
 		return new Urho3D::ResourceAsynCallBackHandlerImpl<TClass, typename std::remove_pointer<typename std::remove_const<Arg>::type>::type>(obj, callback);
 	}
 
+	class AsynCallBackHandlerSimple : public AsynCallBackHandler
+	{
+	public:
+		AsynCallBackHandlerSimple(std::function<void(void)> callback)
+			: callback_(std::move(callback))
+		{
+			assert(callback_);
+		}
+
+		void Execute()
+		{
+			callback_();
+		}
+	private:
+		std::function<void(void)> callback_;
+	};
+
 #define URHO3D_ASYNLOADRESCALLBACK(className, function) (NewResAsynCallBackWarp(this, &className::function))
 #define URHO3D_ASYNCALLBACK_LAMD(function, ...) (new Urho3D::AsynCallBackHandler11Impl<RefCounted>(this, std::bind(function, ##__VA_ARGS__)))
+#define URHO3D_ASYNCALLBACK_SIMPLE(function, ...) (new Urho3D::AsynCallBackHandlerSimple(std::bind(function, ##__VA_ARGS__)))
 }

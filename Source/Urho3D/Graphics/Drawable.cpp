@@ -35,9 +35,14 @@
 #include "../Graphics/Zone.h"
 #include "../IO/Log.h"
 #include "../Scene/Scene.h"
-#include "../Graphics/Technique.h"
-#include "../core/Thread.h"
+//#include "../Graphics/Technique.h"
+#include "../Core/Thread.h"
 #include "../Core/CoreEvents.h"
+//#include "../Resource/XMLFile.h"
+//#include "../Resource/JSONFile.h"
+#include "../Graphics/Graphics.h"
+#include "../Resource/XMLFile.h"
+#include "../Resource/JSONFile.h"
 
 #include "../DebugNew.h"
 
@@ -52,9 +57,17 @@ const char*	V7_MESH_CATEGORY = "V7_Mesh";
 
 const char* GEOMETRY_CATEGORY = "Geometry";
 
-SourceBatch::SourceBatch() = default;
+//SourceBatch::SourceBatch() = default;
+SourceBatch::SourceBatch()
+{
+	tree_ = NULL;
+}
 
-SourceBatch::SourceBatch(const SourceBatch& batch) = default;
+//SourceBatch::SourceBatch(const SourceBatch& batch) = default;
+SourceBatch::SourceBatch(const SourceBatch& batch)
+{
+	tree_ = NULL;
+}
 
 SourceBatch::~SourceBatch() = default;
 
@@ -584,7 +597,7 @@ bool Drawable::RemovePass(const String& passName)
 	return true;
 }
 
-Pass* Drawable::GetPass(String passName)
+Pass* Drawable::GetPass(const String& passName)
 {
 	HashMap<String, SharedPtr<Pass>>::Iterator i = separatePasses_.Find(passName);
 	if (i != separatePasses_.End())
@@ -839,6 +852,543 @@ bool Drawable::RemoveOverrideShaderParameter(const String& name)
         }
     }
     return anythingWritten;
+}
+
+float SourceBatch::createCollisionData(Ray& ray, BoundingBox& boundingBox, PODVector<RayQueryResult>& results, Vector<SharedPtr<BIHTree> >& trees)
+{
+	if(!tree_)
+	{
+		tree_ = new BIHTree(geometry_->GetContext());
+		trees.Push(tree_);
+		if (!tree_->getIsBuildTree())
+		{
+			tree_->buildTree(geometry_);
+		}
+	}
+	else
+	{
+		tree_->Init(0, geometry_->GetIndexCount() / 3 - 1);
+	}
+	return tree_->CollideWithRay(ray, boundingBox, results);
+}
+
+BIHTree::BIHTree(Context* context) :
+	Object(context)
+{
+	root = NULL;
+	m_IsBuildTree = false;
+}
+BIHTree::~BIHTree() = default;
+//BIHTree::BIHTree() 
+//{
+//	root = NULL;
+//	m_IsBuildTree = false;
+//}
+
+//BIHTree::~BIHTree() = default;
+
+//BIHTree::BIHTree()
+//{
+//	root = NULL;
+//	m_IsBuildTree = false;
+//}
+
+void BIHTree::buildTree(Geometry* geometry)
+{
+	const unsigned char* vertexData;
+	const unsigned char* indexData;
+	unsigned vertexSize;
+	unsigned indexSize;
+	const PODVector<VertexElement>* elements;
+	geometry->GetRawData(vertexData, vertexSize, indexData, indexSize, elements);
+	if (!vertexData || !elements || VertexBuffer::GetElementOffset(*elements, TYPE_VECTOR3, SEM_POSITION) != 0)
+		return;
+	float nearest = M_INFINITY;
+	const auto* vertices = (const unsigned char*)vertexData;
+
+	const unsigned short* indices = ((const unsigned short*)indexData) + geometry->GetIndexStart();
+	const unsigned short* indicesEnd = indices + geometry->GetIndexCount();
+	const unsigned short* nearestIndices = nullptr;
+
+	// 16-bit indices
+	if (indexSize == sizeof(unsigned short))
+	{
+		const unsigned short* indices = ((const unsigned short*)indexData) + geometry->GetIndexStart();
+		const unsigned short* indicesEnd = indices + geometry->GetIndexCount();
+		const unsigned short* nearestIndices = nullptr;
+		while (indices < indicesEnd)
+		{
+			Vector3& v0 = *((Vector3*)(&vertices[indices[0] * vertexSize]));
+			Vector3& v1 = *((Vector3*)(&vertices[indices[1] * vertexSize]));
+			Vector3& v2 = *((Vector3*)(&vertices[indices[2] * vertexSize]));
+			originalVertices.Push(v0);
+			originalVertices.Push(v1);
+			originalVertices.Push(v2);
+			indices += 3;
+		}
+	}
+	// 32-bit indices
+	else
+	{
+		const unsigned* indices = ((const unsigned*)indexData) + geometry->GetIndexStart();
+		const unsigned* indicesEnd = indices + geometry->GetIndexCount();
+		const unsigned* nearestIndices = nullptr;
+		while (indices < indicesEnd)
+		{
+			Vector3& v0 = *((Vector3*)(&vertices[indices[0] * vertexSize]));
+			Vector3& v1 = *((Vector3*)(&vertices[indices[1] * vertexSize]));
+			Vector3& v2 = *((Vector3*)(&vertices[indices[2] * vertexSize]));
+			originalVertices.Push(v0);
+			originalVertices.Push(v1);
+			originalVertices.Push(v2);
+			indices += 3;
+		}
+	}
+	triangleNum = (geometry->GetIndexCount() / 3) - 1;
+	Init(0, triangleNum);
+	setIsBuildTree(true);
+}
+
+void BIHTree::Init(int l, int r)
+{
+	BoundingBox* sceneBbox = createBox(l, r);
+	root = createNode(0, r, sceneBbox, 0);
+}
+
+float BIHTree::CollideWithRay(Ray& ray, BoundingBox& boundingBox, PODVector<RayQueryResult>& results)
+{
+	float tMin = ray.HitDistance(boundingBox);
+	float tMax = ray.HitDistanceFarthest(boundingBox);
+	if (tMax <= 0)
+	{
+		tMax = M_INFINITY;
+	}
+	else if (tMin == tMax)
+	{
+		tMin = 0;
+	}
+	if (tMin <= 0)
+	{
+		tMin = 0;
+	}
+	return intersectWhere(ray, tMin, tMax, results);
+}
+
+void BIHTree::setMinMax(BoundingBox* bbox, bool doMin, int axis, float value)
+{
+	//Vector3* min = bbox->getMin();
+	//Vector3* max = bbox->getMax();
+	Vector3 min;
+	bbox->getMin(min);
+	Vector3 max;
+	bbox->getMax(max);
+
+	if (doMin)
+	{
+		min.set(axis, value);
+	}
+	else
+	{
+		max.set(axis, value);
+	}
+
+	bbox->setMinMax(min, max);
+}
+
+float BIHTree::getMinMax(BoundingBox* bbox, bool doMin, int axis)
+{
+	if (doMin)
+	{
+		Vector3 vec;
+		bbox->getMin(vec);
+		return getVectorValueByIndex(vec, axis);
+	}
+	else
+	{
+		Vector3 vec;
+		bbox->getMax(vec);
+		return getVectorValueByIndex(vec, axis);
+	}
+}
+
+BoundingBox* BIHTree::createBox(int l, int r)
+{
+	Vector3* min = new Vector3(M_INFINITY, M_INFINITY, M_INFINITY);
+	Vector3* max = new Vector3(-M_INFINITY, -M_INFINITY, -M_INFINITY);
+	/*
+	Vector3* v1 = new Vector3(Vector3::ZERO);
+	Vector3* v2 = new Vector3(Vector3::ZERO);
+	Vector3* v3 = new Vector3(Vector3::ZERO);
+	*/
+	Vector3 v1, v2, v3;
+	if (tempVars.Empty())
+	{
+		tempVars.Push(*min);
+		tempVars.Push(*max);
+		tempVars.Push(v1);
+		tempVars.Push(v2);
+		tempVars.Push(v3);
+	}
+	else
+	{
+		tempVars[VertexType::VERTEX_Min] = *min;
+		tempVars[VertexType::VERTEX_Max] = *max;
+		tempVars[VertexType::VERTEX_V1] = v1;
+		tempVars[VertexType::VERTEX_V2] = v2;
+		tempVars[VertexType::VERTEX_V3] = v3;
+	}
+	for (int i = l; i <= r; i++)
+	{
+		getTriangle(i, v1, v2, v3);
+		BoundingBox::checkMinMax(*min, *max, v1);
+		BoundingBox::checkMinMax(*min, *max, v2);
+		BoundingBox::checkMinMax(*min, *max, v3);
+	}
+
+	BoundingBox* bbox = new BoundingBox(*min, *max);
+	return bbox;
+}
+
+int BIHTree::sortTriangles(int l, int r, float split, int axis)
+{
+	int pivot = l;
+	int j = r;
+
+	Vector3 v1, v2, v3;
+	//Vector3* v2 = new Vector3(Vector3::ZERO);
+	//Vector3* v3 = new Vector3(Vector3::ZERO);
+	tempVars[VertexType::VERTEX_V1] = v1;
+	tempVars[VertexType::VERTEX_V2] = v2;
+	tempVars[VertexType::VERTEX_V3] = v3;
+	while (pivot <= j)
+	{
+		getTriangle(pivot, v1, v2, v3);
+		v1 += v2; v1 += v3; v1 *= ONE_THIRD;
+		if (getVectorValueByIndex(v1, axis) > split)
+		{
+			swapTriangles(pivot, j);
+			--j;
+		}
+		else
+		{
+			++pivot;
+		}
+	}
+	pivot = (pivot == l && j < pivot) ? j : pivot;
+	return pivot;
+}
+
+void BIHTree::swapTriangles(int index1, int index2)
+{
+	// swap indices
+	Vector3 tmp = originalVertices[index1];
+	originalVertices[index1] = originalVertices[index2];
+	originalVertices[index2] = tmp;
+}
+
+void BIHTree::getTriangle(int index, Vector3& v1, Vector3& v2, Vector3& v3)
+{
+	int pointIndex = index * 3;
+	v1 = originalVertices[pointIndex++];
+	v2 = originalVertices[pointIndex++];
+	v3 = originalVertices[pointIndex++];
+}
+
+BIHNode* BIHTree::createNode(int l, int r, BoundingBox* nodeBbox, int depth)
+{
+	if ((r - l) < maxTrisPerNode || depth > max_tree_depth)
+	{
+		return (new BIHNode(l, r));
+	}
+
+	BoundingBox* currentBox = createBox(l, r);
+
+	Vector3 exteriorExt = nodeBbox->Extent();
+	Vector3 interiorExt = currentBox->Extent();
+	exteriorExt -= interiorExt;
+
+	int axis = 0;
+	if (exteriorExt.x_ > exteriorExt.y_)
+	{
+		if (exteriorExt.x_ > exteriorExt.z_)
+		{
+			axis = 0;
+		}
+		else
+		{
+			axis = 2;
+		}
+	}
+	else
+	{
+		if (exteriorExt.y_ > exteriorExt.z_)
+		{
+			axis = 1;
+		}
+		else
+		{
+			axis = 2;
+		}
+	}
+	if (exteriorExt == (Vector3::ZERO))
+	{
+		axis = 0;
+	}
+	float split = getVectorValueByIndex(currentBox->Center(), axis);
+	int pivot = sortTriangles(l, r, split, axis);
+	if (pivot == l || pivot == r)
+	{
+		pivot = (r + l) / 2;
+	}
+
+	// If one of the partitions is empty, continue with recursion: same level but different bbox
+	if (pivot < l)
+	{
+		// Only right
+		BoundingBox* rbbox = new BoundingBox(currentBox);
+		setMinMax(rbbox, true, axis, split);
+		return createNode(l, r, rbbox, depth + 1);
+		//createNode(node,l, r, rbbox, depth + 1);
+	}
+	else if (pivot > r)
+	{
+		// Only left
+		BoundingBox* lbbox = new BoundingBox(currentBox);
+		setMinMax(lbbox, false, axis, split);
+		return createNode(l, r, lbbox, depth + 1);
+		//createNode(node,l, r, lbbox, depth + 1);
+	}
+	else
+	{
+		// Build the node
+		BIHNode* node = new BIHNode(axis);
+
+		// Left child
+		BoundingBox* lbbox = new BoundingBox(currentBox);
+		setMinMax(lbbox, false, axis, split);
+
+		// The left node right border is the plane most right
+		node->setLeftPlane(getMinMax(createBox(l, Max(l, pivot - 1)), false, axis));
+		node->setLeftChild(createNode(l, Max(l, pivot - 1), lbbox, depth + 1)); // Recursive call
+
+		BoundingBox* rbbox = new BoundingBox(currentBox);
+		setMinMax(rbbox, true, axis, split);
+		// The right node left border is the plane most left
+		node->setRightPlane(getMinMax(createBox(pivot, r), true, axis));
+		node->setRightChild(createNode(pivot, r, rbbox, depth + 1)); // Recursive call
+																	 //node->parent = node;
+		return node;
+	}
+}
+
+Vector3 BIHNode::ComputeTriangleNormal(Vector3 v1, Vector3 v2, Vector3 v3)
+{
+	Vector3 vec;
+	vec.x_ = (v2.y_ - v1.y_)*(v3.z_ - v1.z_) - (v2.z_ - v1.z_) * (v3.y_ - v1.y_);
+	vec.y_ = (v2.z_ - v1.z_)*(v3.x_ - v1.x_) - (v2.x_ - v1.x_) * (v3.z_ - v1.z_);
+	vec.z_ = (v2.x_ - v1.x_)*(v3.y_ - v1.y_) - (v2.y_ - v1.y_) * (v3.x_ - v1.x_);
+	return vec;
+}
+
+int BIHTree::intersectWhere(Ray r, float sceneMin, float sceneMax, PODVector<RayQueryResult>& results)
+{
+	Vector3 o = r.origin_;
+	Vector3 d = r.direction_;
+
+	float origins[] = { r.origin_.x_,
+		r.origin_.y_,
+		r.origin_.z_ };
+
+	float invDirections[] = { 1.0f / r.direction_.x_,
+		1.0f / r.direction_.y_,
+		1.0f / r.direction_.z_ };
+
+	r.direction_.Normalized();
+
+	Vector3* v1 = new Vector3(Vector3::ZERO);
+	Vector3* v2 = new Vector3(Vector3::ZERO);
+	Vector3* v3 = new Vector3(Vector3::ZERO);
+	tempVars[VertexType::VERTEX_V1] = *v1;
+	tempVars[VertexType::VERTEX_V2] = *v2;
+	tempVars[VertexType::VERTEX_V3] = *v3;
+	int cols = 0;
+	BIHNode* temp = new BIHNode(0);
+	*temp = *root;
+	stackData.push(new BIHStackData(root, sceneMin, sceneMax));
+	while (stackData.size() > 0) {
+
+		//BIHStackData data = stack.remove(stack.size() - 1);
+		BIHStackData* data = stackData.top();
+		stackData.pop();
+		BIHNode* node = data->node;
+		float tMin = data->min,
+			tMax = data->max;
+
+		if (tMax < tMin) {
+			continue;
+		}
+
+		while (node->axis != 3) { // while node is not a leaf
+			int a = node->axis;
+
+			// find the origin and direction value for the given axis
+			float origin = origins[a];
+			float invDirection = invDirections[a];
+
+			float tNearSplit, tFarSplit;
+			BIHNode* nearNode;
+			BIHNode* farNode;
+
+			tNearSplit = (node->leftPlane - origin) * invDirection;
+			tFarSplit = (node->rightPlane - origin) * invDirection;
+			nearNode = node->left;
+			farNode = node->right;
+
+			if (invDirection < 0) {
+				float tmpSplit = tNearSplit;
+				tNearSplit = tFarSplit;
+				tFarSplit = tmpSplit;
+
+				BIHNode tmpNode = *nearNode;
+				nearNode = farNode;
+				farNode = &tmpNode;
+			}
+
+			if (tMin > tNearSplit && tMax < tFarSplit) {
+				continue;
+			}
+
+			if (tMin > tNearSplit) {
+				tMin = Max(tMin, tFarSplit);
+				*node = *farNode;
+			}
+			else if (tMax < tFarSplit) {
+				tMax = Min(tMax, tNearSplit);
+				*node = *nearNode;
+			}
+			else {
+				stackData.push(new BIHStackData(farNode, Max(tMin, tFarSplit), tMax));
+				//stack.add(new BIHStackData(farNode, Max(tMin, tFarSplit), tMax));
+				tMax = Min(tMax, tNearSplit);
+				*node = *nearNode;
+			}
+		}
+		for (int i = node->leftIndex; i <= node->rightIndex; i++) {
+			Vector3 v1, v2, v3;
+			getTriangle(i, v1, v2, v3);
+			Vector3 normal;
+			Vector2 outUV;
+			float distance = r.Intersect(v1, v2, v3, normal, outUV);
+			if (distance != M_INFINITY) {
+				Vector3 contactNormal = node->ComputeTriangleNormal(v1, v2, v3);
+				Vector3 temp;
+				temp = d * distance + o;
+				Vector3 contactPoint = temp;
+				Vector2 geometryUV = Vector2::ZERO;
+				RayQueryResult cr;
+				cr.distance_ = distance;
+				cr.normal_ = normal;
+				cr.position_ = contactPoint;
+				cr.textureUV_ = outUV;
+				cr.subObject_ = cols;
+				results.Push(cr);
+				cols++;
+			}
+		}
+	}
+	r.origin_ = o;
+	r.direction_ = d;
+	*root = *temp;
+	return cols;
+}
+
+Tree::Tree(Context* context) :
+	Resource(context)
+{
+}
+
+Tree::~Tree() = default;
+
+void Tree::RegisterObject(Context* context)
+{
+	context->RegisterFactory<Tree>();
+}
+
+void Tree::SetBIHTrees(const Vector<SharedPtr<BIHTree> >& tree)
+{
+	bihTrees_ = tree;
+}
+
+Vector<SharedPtr<BIHTree> >& Tree::GetBIHTrees()
+{
+	return bihTrees_;
+}
+
+bool Tree::BeginLoad(Deserializer& source)
+{
+	// Check ID
+	String fileID = source.ReadFileID();
+	if(!fileID.Contains("BT3"))	
+	{
+		URHO3D_LOGERROR(source.GetName() + " is not a valid bihTree file");
+		return true;
+	}
+	URHO3D_LOGDEBUG("fileID="+ String(fileID));
+	bihTrees_.Clear();
+
+	unsigned memoryUse = sizeof(Tree);
+	bool async = GetAsyncLoadState() == ASYNC_LOADING;
+
+	// Read bihTree num
+	unsigned numBihTrees = source.ReadUInt();
+	URHO3D_LOGDEBUG("numBihTrees=" + String(numBihTrees));
+	//numBihTrees = 0;
+	bihTrees_.Reserve(numBihTrees);
+	int verticesNum = 0;
+	for (unsigned i = 0; i < numBihTrees; ++i)
+	{
+		SharedPtr<BIHTree> tree(new BIHTree(context_));
+		//SharedPtr<BIHTree>& desc = bihTrees_[i];
+		verticesNum = source.ReadUInt();
+		for (int j = 0; j < verticesNum; ++j)
+		{
+			Vector3 vec = source.ReadVector3();
+			tree->originalVertices.Push(vec);
+		}
+		bihTrees_.Push(tree);
+		memoryUse += sizeof(Vector3) * verticesNum;
+	}
+
+	SetMemoryUse(memoryUse);
+	return true;
+}
+
+bool Tree::EndLoad()
+{
+	return true;
+}
+
+/// Save resource. Return true if successful.
+bool Tree::Save(Serializer& dest)const
+{
+	// Write ID
+	if (!dest.WriteFileID("BT3"))
+		return false;
+	
+    // Write BIHTree  attribute
+	dest.WriteUInt(bihTrees_.Size());
+	for (unsigned i = 0; i < bihTrees_.Size(); ++i)
+	{
+		SharedPtr<BIHTree> info = bihTrees_[i];
+		// Write vertices coordinate
+		dest.WriteUInt(info->originalVertices.Size());
+		for (unsigned j = 0; j < info->originalVertices.Size(); ++j)
+		{
+			dest.WriteVector3(info->originalVertices[j]);
+		}
+	}
+	
+	return true;
 }
 
 }

@@ -28,6 +28,7 @@
 #include "../Graphics/AnimatedModel.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/DebugRenderer.h"
+#include "../Graphics/Renderer.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Light.h"
 #include "../Graphics/ShaderVariation.h"
@@ -82,6 +83,7 @@ void DebugRenderer::SetView(Camera* camera)
     projection_ = camera->GetProjection();
     gpuProjection_ = camera->GetGPUProjection();
     frustum_ = camera->GetFrustum();
+	isOrthographic_ = camera->IsOrthographic();
 }
 
 void DebugRenderer::AddLine(const Vector3& start, const Vector3& end, const Color& color, bool depthTest)
@@ -496,8 +498,19 @@ void DebugRenderer::Render()
 
     URHO3D_PROFILE(RenderDebugGeometry);
 
-    ShaderVariation* vs = graphics->GetShader(VS, "Basic", "VERTEXCOLOR");
-    ShaderVariation* ps = graphics->GetShader(PS, "Basic", "VERTEXCOLOR");
+	ShaderVariation* vs;
+	ShaderVariation* ps;
+	if (GetSubsystem<Renderer>()->IsUsingLogDepth())
+	{
+		vs = graphics->GetShader(VS, "Basic", "VERTEXCOLOR LOGDEPTH");
+		ps = graphics->GetShader(PS, "Basic", "VERTEXCOLOR LOGDEPTH");
+	}
+	else
+	{
+		vs = graphics->GetShader(VS, "Basic", "VERTEXCOLOR");
+		ps = graphics->GetShader(PS, "Basic", "VERTEXCOLOR");
+	}
+   
 
     unsigned numVertices = (lines_.Size() + noDepthLines_.Size()) * 2 + (triangles_.Size() + noDepthTriangles_.Size()) * 3;
     // Resize the vertex buffer if too small or much too large
@@ -600,6 +613,17 @@ void DebugRenderer::Render()
     graphics->SetShaderParameter(VSP_VIEWPROJ, gpuProjection_ * view_);
     graphics->SetShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
     graphics->SetVertexBuffer(vertexBuffer_);
+
+	if (isOrthographic_)
+	{
+		graphics->SetShaderParameter(VSP_CAMERAORTHO, true);
+		graphics->SetShaderParameter(PSP_CAMERAORTHO, true);
+	}
+	else
+	{
+		graphics->SetShaderParameter(VSP_CAMERAORTHO, false);
+		graphics->SetShaderParameter(PSP_CAMERAORTHO, false);
+	}
 
     unsigned start = 0;
     unsigned count = 0;

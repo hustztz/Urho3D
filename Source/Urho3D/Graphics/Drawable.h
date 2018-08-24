@@ -26,6 +26,14 @@
 #include "../Graphics/Technique.h"
 #include "../Math/BoundingBox.h"
 #include "../Scene/Component.h"
+#include <iostream>
+#include <stack>
+#include<algorithm>
+#include <stdio.h>
+#include <stdlib.h>
+#include "../Resource/Resource.h"
+
+using namespace std;
 
 namespace Urho3D
 {
@@ -58,6 +66,8 @@ struct WorkItem;
 class Pass;
 class MaterialShaderParameter;
 class Drawable;
+class XMLFile;
+class JSONFile;
 
 /// Geometry update type.
 enum UpdateGeometryType
@@ -86,15 +96,175 @@ struct FrameInfo
     Camera* camera_;
 };
 
+enum VertexType
+{
+	VERTEX_Min = 0,
+	VERTEX_Max = 1,
+	VERTEX_V1 = 2,
+	VERTEX_V2 = 3,
+	VERTEX_V3 = 4
+};
+
+class BIHNode;
+struct URHO3D_API BIHStackData
+{
+	BIHNode* node;
+	float min, max;
+	BIHStackData(BIHNode* Node, float Min, float Max) {
+		this->node = Node;
+		this->min = Min;
+		this->max = Max;
+	}
+	BIHStackData& operator=(const BIHStackData& s)//§à§á§ß§á§ß¨j¨j§ã§Ú§é  
+	{
+		this->node = s.node;
+	}
+};
+
+class URHO3D_API BIHTree : public Object
+{
+	URHO3D_OBJECT(BIHTree, Object);
+
+public:
+	/// Construct.
+	BIHTree(Context* context);
+	~BIHTree();
+	void Init(int l, int r);
+	float CollideWithRay(Ray& ray, BoundingBox& boundingBox, PODVector<RayQueryResult>& results);
+	float getMinMax(BoundingBox* bbox, bool doMin, int axis);
+	float getVectorValueByIndex(Vector3 &vec, int index)
+	{
+		switch (index)
+		{
+		case 0:
+			return vec.x_;
+		case 1:
+			return vec.y_;
+		case 2:
+			return vec.z_;
+		}
+	}
+	int intersectWhere(Ray r, float sceneMin, float sceneMax, PODVector<RayQueryResult>& results);
+	int sortTriangles(int l, int r, float split, int axis);
+	void swapTriangles(int index1, int index2);
+	void getTriangle(int index, Vector3& v1, Vector3& v2, Vector3& v3);
+	BoundingBox* createBox(int l, int r);
+	BIHNode* createNode(int l, int r, BoundingBox* nodeBbox, int depth);
+	void setMinMax(BoundingBox* bbox, bool doMin, int axis, float value);
+	void buildTree(Geometry* geometry);
+	bool getIsBuildTree() { return m_IsBuildTree; }
+	void setIsBuildTree(bool isBuildTree) { m_IsBuildTree = isBuildTree; }
+
+	PODVector<Vector3> tempVars;
+	stack<BIHStackData*> stackData;
+	PODVector<Vector3> originalVertices;
+private:
+	int maxTrisPerNode = 21;
+	int max_tree_depth = 100;
+	float ONE_THIRD = 1.0f / 3.0f;
+	int triangleNum = 0;
+	bool m_IsBuildTree;
+	BIHNode* root;
+};
+
+class URHO3D_API Tree : public Resource
+{
+	URHO3D_OBJECT(Tree, Resource);
+
+public:
+	/// Construct.
+	explicit Tree(Context* context);
+	/// Destruct.
+	~Tree() override;
+	/// Register object factory.
+	static void RegisterObject(Context* context);
+	/// Load resource from stream. May be called from a worker thread. Return true if successful.
+	bool BeginLoad(Deserializer& source) override;
+	/// Finish resource loading. Always called from the main thread. Return true if successful.
+	bool EndLoad() override;
+	/// Save resource. Return true if successful.
+	bool Save(Serializer& dest) const override;
+
+	/// Load from an XML element. Return true if successful.
+	bool Load(const XMLElement& source);
+	/// Save to an XML element. Return true if successful.
+	bool Save(XMLElement& dest) const;
+
+	/// Load from a JSON value. Return true if successful.
+	bool Load(const JSONValue& source);
+	/// Save to a JSON value. Return true if successful.
+	bool Save(JSONValue& dest) const;
+	/// Set index buffers.
+	void SetBIHTrees(const Vector<SharedPtr<BIHTree> >& tree);
+	Vector<SharedPtr<BIHTree> >& GetBIHTrees();
+private:
+	/// bihTree.
+	Vector<SharedPtr<BIHTree> > bihTrees_;
+};
+
+class URHO3D_API BIHNode
+{
+public:
+	BIHNode(int axis) {
+		this->axis = axis;
+	}
+	BIHNode(int l, int r)
+	{
+		leftIndex = l;
+		rightIndex = r;
+		axis = 3; // indicates leaf
+	}
+	//~BIHNode();
+	BIHNode* getLeftChild() {
+		return this->left;
+	}
+
+	void setLeftChild(BIHNode* left) {
+		this->left = left;
+	}
+
+	float getLeftPlane() {
+		return leftPlane;
+	}
+
+	void setLeftPlane(float leftPlane) {
+		this->leftPlane = leftPlane;
+	}
+
+	BIHNode* getRightChild() {
+		return this->right;
+	}
+
+	void setRightChild(BIHNode* right) {
+		this->right = right;
+	}
+
+	float getRightPlane() {
+		return rightPlane;
+	}
+
+	void setRightPlane(float rightPlane) {
+		this->rightPlane = rightPlane;
+	}
+	Vector3 ComputeTriangleNormal(Vector3 v1, Vector3 v2, Vector3 v3);
+	int leftIndex, rightIndex;
+	float leftPlane;
+	float rightPlane;
+	BIHNode* left;
+	BIHNode* right;
+	int axis;
+
+};
+
 /// Source data for a 3D geometry draw call.
 struct URHO3D_API SourceBatch
 {
     /// Construct with defaults.
-    SourceBatch();
+	SourceBatch();
     /// Copy-construct.
     SourceBatch(const SourceBatch& batch);
     /// Destruct.
-    ~SourceBatch();
+	~SourceBatch();
 
     /// Assignment operator.
     SourceBatch& operator =(const SourceBatch& rhs);
@@ -114,6 +284,9 @@ struct URHO3D_API SourceBatch
     /// %Geometry type.
     GeometryType geometryType_{GEOM_STATIC};
 	
+	float createCollisionData(Ray& ray, BoundingBox& boundingBox, PODVector<RayQueryResult>& results, Vector<SharedPtr<BIHTree> >& trees);
+	//BIHTree* tree;
+	SharedPtr<BIHTree> tree_;
 	/*SharedPtr<Material> oldMaterial_;
 	SharedPtr<Technique> oldTechnique_;*/
 };
@@ -354,7 +527,7 @@ public:
 	//Pass* AddPass(unsigned int index, const String& passName, const String& vsName, const String& psName, const String& vsDefines = "", const String& psDefines = "");
 	bool RemovePass(const String& passName);
 	//bool RemovePass(unsigned int index, const String& passName);
-	Pass* GetPass(String passName);
+	Pass* GetPass(const String& passName);
 
 	/// Set override shader parameter.
 	void SetOverrideShaderParameter(const String& name, const Variant& value);

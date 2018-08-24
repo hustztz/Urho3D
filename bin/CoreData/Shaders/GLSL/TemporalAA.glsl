@@ -224,9 +224,9 @@ vec4 temporal_reprojection(vec2 ss_txc, vec2 ss_vel, float vs_dist)
 
 	// clamp to neighbourhood of current sample
 #ifdef USE_CLIPPING
-	texel1 = clip_aabb(cmin.xyz, cmax.xyz, clamp(cavg, cmin, cmax), texel1);
+	vec4 texel1clip = clip_aabb(cmin.xyz, cmax.xyz, clamp(cavg, cmin, cmax), texel1);
 #else
-	texel1 = clamp(texel1, cmin, cmax);
+	vec4 texel1clip = clamp(texel1, cmin, cmax);
 #endif
 
 	// feedback weight from unbiased luminance diff (t.lottes)
@@ -240,8 +240,10 @@ vec4 temporal_reprojection(vec2 ss_txc, vec2 ss_vel, float vs_dist)
 	float unbiased_diff = abs(lum0 - lum1) / max(lum0, max(lum1, 0.2));
 	float unbiased_weight = 1.0 - unbiased_diff;
 	float unbiased_weight_sqr = unbiased_weight * unbiased_weight;
-	float k_feedback = mix(cTemporlAAFeedbackMin, cTemporlAAFeedbackMax, unbiased_weight_sqr) * clamp( 1. - length(ss_vel)*100., 0., 1.);
-
+	float speedFactor = clamp( 1. - length(ss_vel)*10000., 0., 1.);
+	float k_feedback = mix(cTemporlAAFeedbackMin, cTemporlAAFeedbackMax, unbiased_weight_sqr) * speedFactor;
+	
+	texel1 = mix(texel1clip, texel1, speedFactor);
 	// output
 	return mix(texel0, texel1, k_feedback);
 }

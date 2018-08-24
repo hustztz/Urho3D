@@ -443,6 +443,7 @@ void RegisterGraphicsLibrary(Context* context)
 	DayNightWeatherControl::RegisterObject(context);
 	BillboardDrawable::RegisterObject(context);
 	BillboardGUIDrawable::RegisterObject(context);
+	Tree::RegisterObject(context);
 }
 
 }

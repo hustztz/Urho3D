@@ -59,10 +59,10 @@ namespace Urho3D
 
 		float offsetX = HaltonRandom(GetSubsystem<Time>()->GetFrameNumber() % 1023, 2);
 		float offsetY = HaltonRandom(GetSubsystem<Time>()->GetFrameNumber() % 1023, 3);
-	//	offsetX = offsetX*2.f - 1.f;
-	//	offsetY = offsetY*2.f - 1.f;
-	//	offsetX *= 1;
-	//	offsetY *= 1;
+		offsetX = offsetX*2.f - 1.f;
+		offsetY = offsetY*2.f - 1.f;
+		offsetX *= 0.5f;
+		offsetY *= 0.5f;
 		offsetX /= width;
 		offsetY /= height;
 
@@ -91,7 +91,7 @@ namespace Urho3D
 //			projection.m23_ += projection.m33_ * constantBias;
 //#endif
 //			URHO3D_LOGERROR(String("VPMDemp:") + (projection * viewPort_->GetCamera()->GetView()).ToString());
-//		URHO3D_LOGERROR("TemporalAA Update");
+		//URHO3D_LOGERROR("TemporalAA Update");
 //		}
 	}
 
@@ -108,6 +108,6 @@ namespace Urho3D
 		projection.m02_ = 0.f;
 		projection.m12_ = 0.f;
 		lastVPMatrix_ = projection * viewPort_->GetCamera()->GetView();
-//		URHO3D_LOGERROR("TemporalAA PostUpdate");
+	//	URHO3D_LOGERROR("TemporalAA PostUpdate");
 	}
 }
