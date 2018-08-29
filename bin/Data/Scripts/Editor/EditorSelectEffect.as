@@ -5,6 +5,7 @@ bool ginscene = false;
 
 class DrawEffectDesc
 {
+    bool PostEffect = false;
     bool mIsAble;
     String mEffectName;
     Variant mArgMap;
@@ -12,9 +13,9 @@ class DrawEffectDesc
     CancelEffectFunc@ mClearEffectFunc;
     EditorSelectEffectInfoData@ mSaveData;
     float titlew  = 80;
-    float offsetx = 25;
+    float offsetx = 40;
     float width   = 250;
-    float height  = 16;
+    float height  = 24;
 
     Array<LineEdit@> mColorWnd;
 
@@ -112,7 +113,7 @@ class DrawEffectDesc
     UIElement@ CreateFloatWnd(String argname, float value, int argindex)
     {
         UIElement@ agrwnd = UIElement();
-        agrwnd.SetMinSize(width, height);
+        agrwnd.SetFixedSize(width, height);
         agrwnd.defaultStyle = uiStyle;
 
         Text@ title = CreateTitleWnd(agrwnd, argname);
@@ -130,7 +131,7 @@ class DrawEffectDesc
     UIElement@ CreateColorWnd(Color color, int argindex = -1)
     {
         UIElement@ agrwnd = UIElement();
-        agrwnd.SetMinSize(width, height);
+        agrwnd.SetFixedSize(width, height);
         agrwnd.defaultStyle = uiStyle;
         
         float space = 45;
@@ -166,7 +167,7 @@ class DrawEffectDesc
     UIElement@ CreateBoolWnd(String argname, bool able, int argindex = -1)
     {
         UIElement@ agrwnd = UIElement();
-        agrwnd.SetMinSize(width, height);
+        agrwnd.SetFixedSize(width, height);
         Text@ title = CreateTitleWnd(agrwnd, argname);
         title.SetPosition(offsetx, 0);
         
@@ -291,10 +292,12 @@ class EditorSelectEffect
     TemporalAAFilter@ mTemporalAAFilter;
     BloomHDRFilter@ mBloomHDRFilter;
     DeferredHBAOFilter@ mDeferredHBAOFilter;
+    DeferredHBAOTemporalFilter@ mDeferredHBAOTemporalFilter;
     LensFlareFilter@ mLensFlareFilter;
     TranslucentAfterHDRFilter@ mTranslucentAfterHDRFilter;
     DepthOfFieldFilter@ mDepthOfFieldFilter;
     EDLFilter@ mEDLFilter;
+    VignetteFilter@ mVignetteFilter;
     
     Node@ mCurEffectNode;
 
@@ -310,6 +313,10 @@ class EditorSelectEffect
         mDeferredHBAOFilter = DeferredHBAOFilter(viewport);
         viewport.AddFilter(mDeferredHBAOFilter);
         mDeferredHBAOFilter.enable = false;
+
+        mDeferredHBAOTemporalFilter = DeferredHBAOTemporalFilter(viewport);
+      //  viewport.AddFilter(mDeferredHBAOTemporalFilter);
+        mDeferredHBAOTemporalFilter.enable = false;
 
         mTranslucentFilter = TranslucentFilter(viewport);
         viewport.AddFilter(mTranslucentFilter);
@@ -355,10 +362,16 @@ class EditorSelectEffect
         mTemporalAAFilter = TemporalAAFilter(viewport);
         viewport.AddFilter(mTemporalAAFilter);
         mTemporalAAFilter.enable = false;
+        
+        mVignetteFilter = VignetteFilter(viewport);
+        viewport.AddFilter(mVignetteFilter);
+        mVignetteFilter.enable = false;
 
         mEDLFilter = EDLFilter(viewport);
         viewport.AddFilter(mEDLFilter);
         mEDLFilter.enable = false;
+
+        
 
         InitEffectDescList();
 
@@ -477,10 +490,10 @@ class EditorSelectEffect
     ///环境遮蔽
     {
         VariantMap map;
-        map["Arg1"]     = float(0.7);
+        map["Arg1"]     = float(1.0);
         map["ArgName1"] = "AO强度:";
         
-        map["Arg2"]     = float(2.0);
+        map["Arg2"]     = float(20.0);
         map["ArgName2"] = "AO半径:";
         
         map["Arg3"]     = float(8.0);
@@ -495,10 +508,37 @@ class EditorSelectEffect
         map["Arg6"]     = float(30);
         map["ArgName6"] = "AO阈值°:";
         
-        map["Arg7"]     = float(4.0);
+        map["Arg7"]     = float(6.0);
         map["ArgName7"] = "滤波半径:";
 
         mDefferDescList.Push(DrawEffectDesc("环境遮蔽(AO)", DrawEffectFunc(this.OpenDeferredHBAOEffect), CancelEffectFunc(this.CloseDeferredHBAOEffect), Variant(map)));
+    }
+
+    ///环境遮蔽 TAO
+    {
+        VariantMap map;
+        map["Arg1"]     = float(1.0);
+        map["ArgName1"] = "AO强度:";
+        
+        map["Arg2"]     = float(20.0);
+        map["ArgName2"] = "AO半径:";
+        
+        map["Arg3"]     = float(8.0);
+        map["ArgName3"] = "圆周采样:";
+                
+        map["Arg4"]     = float(4.0);
+        map["ArgName4"] = "径向采样:";
+        
+        map["Arg5"]     = float(1.0);
+        map["ArgName5"] = "AO衰减:";
+        
+        map["Arg6"]     = float(30);
+        map["ArgName6"] = "AO阈值°:";
+        
+        map["Arg7"]     = float(6.0);
+        map["ArgName7"] = "滤波半径:";
+
+        mDefferDescList.Push(DrawEffectDesc("环境遮蔽(TemporalAO)", DrawEffectFunc(this.OpenDeferredHBAOTemporalEffect), CancelEffectFunc(this.CloseDeferredHBAOTemporalEffect), Variant(map)));
     }
     ///高动态范围
         mDefferDescList.Push(DrawEffectDesc("高动态范围(HDR)", DrawEffectFunc(this.OpenHDREffect), CancelEffectFunc(this.CloseHDREffect), Variant() , true));
@@ -512,13 +552,13 @@ class EditorSelectEffect
     ///景深
     {
         VariantMap map;
-        map["Arg1"]     = float(6);
+        map["Arg1"]     = float(14);
         map["ArgName1"] = "闪光圈max:";
         
-        map["Arg2"]     = float(30);
+        map["Arg2"]     = float(100);
         map["ArgName2"] = "成像距离:";
         
-        map["Arg3"]     = float(0.1);
+        map["Arg3"]     = float(0.3);
         map["ArgName3"] = "焦距:";
         
         map["Arg4"]     = float(1.4);
@@ -545,9 +585,24 @@ class EditorSelectEffect
         map["ArgName2"] = "增益:";
         mDefferDescList.Push(DrawEffectDesc("点云(EDL)", DrawEffectFunc(this.OpenEDLFilter), CancelEffectFunc(this.CloseEDLFilter), Variant(map)));
     }
+    ///VignetteFilter
+    {
+        VariantMap map;
+        map["Arg1"]     = float(0.3);
+        map["ArgName1"] = "衰减:";
+
+        mDefferDescList.Push(DrawEffectDesc("Vignette", DrawEffectFunc(this.OpenVignetteFilter), CancelEffectFunc(this.CloseVignetteFilter), Variant(map)));
+    }
 
     ///LogDepth
         mDefferDescList.Push(DrawEffectDesc("LogDepth", DrawEffectFunc(this.OpenLogDepth), CancelEffectFunc(this.CloseLogDepth), Variant(), true));
+
+        for(int i=0; i < mDefferDescList.length; ++i)
+        {
+            mDefferDescList[i].PostEffect = true;
+        }
+
+        
     }
 
 ///AO
@@ -569,6 +624,27 @@ class EditorSelectEffect
     void CloseDeferredHBAOEffect()
     {
         mDeferredHBAOFilter.enable = false;
+    }
+
+///TemporalAO
+    void OpenDeferredHBAOTemporalEffect(Variant& var)
+    {
+        VariantMap map = var.GetVariantMap();
+
+        mDeferredHBAOTemporalFilter.SetHBAOIntensity(map["Arg1"].GetFloat());
+        mDeferredHBAOTemporalFilter.SetAORadius(map["Arg2"].GetFloat());
+        mDeferredHBAOTemporalFilter.SetAONumDir(map["Arg3"].GetFloat());
+        mDeferredHBAOTemporalFilter.SetAONumSteps(map["Arg4"].GetFloat());
+        mDeferredHBAOTemporalFilter.SetAOAttenuation(map["Arg5"].GetFloat());
+        mDeferredHBAOTemporalFilter.SetAOAngleBias(map["Arg6"].GetFloat());
+        mDeferredHBAOTemporalFilter.SetBilateralBlurRadius(map["Arg7"].GetFloat());
+
+        mDeferredHBAOTemporalFilter.enable = true;
+    }
+
+    void CloseDeferredHBAOTemporalEffect()
+    {
+        mDeferredHBAOTemporalFilter.enable = false;
     }
 
 ///HDR
@@ -643,6 +719,20 @@ class EditorSelectEffect
     {
         mTemporalAAFilter.enable = false;
     }
+
+///Vignette
+    void OpenVignetteFilter(Variant& var)
+    {
+        VariantMap map = var.GetVariantMap();
+        mVignetteFilter.SetFalloff(map["Arg1"].GetFloat());
+        mVignetteFilter.enable = true;
+    }
+
+    void CloseVignetteFilter()
+    {
+        mVignetteFilter.enable = false;
+    }
+
 
 ///EDL
     void OpenEDLFilter(Variant& var)

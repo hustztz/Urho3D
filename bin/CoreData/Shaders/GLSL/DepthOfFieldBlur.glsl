@@ -33,7 +33,7 @@ void PS()
 
     for (int si = 0; si < kSampleCount; si++)
     {
-        vec2 disp = kDiskKernel[si] * cMaxCoC;
+        vec2 disp = kDiskKernel[si] * cMaxCoC * cViewportDivisior;
         float dist = length(disp);
 
         vec2 duv = vec2(disp.x * cGBufferInvSize.x / cGBufferInvSize.y, disp.y);
@@ -71,10 +71,10 @@ void PS()
 
     // BG: Calculate the alpha value only based on the center CoC.
     // This is a rather aggressive approximation but provides stable results.
-    bgAcc.a = smoothstep((cGBufferInvSize*cViewportDivisior).y, (cGBufferInvSize*cViewportDivisior).y * 2, samp0.a);
+    bgAcc.a = smoothstep((cGBufferInvSize*cViewportDivisior).y, (cGBufferInvSize*cViewportDivisior).y * 2., samp0.a);
 
     // FG: Normalize the total of the weights.
-    fgAcc.a *= 6. * M_PI / float(kSampleCount);
+    fgAcc.a *= M_PI / float(kSampleCount);
 
     // Alpha premultiplying
     vec3 rgb = vec3(0.);

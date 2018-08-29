@@ -4,7 +4,7 @@
 	<command type="scenepass" pass="outlineFill" output="fill" depthstencil="depth">
 		<parameter name="OutlineColor" value="1.0 1.0 1.0 1.0" />
 	</command>		
-	<command type="quad" tag="outline" vs="OutlineFine" ps="OutlineFine" output="viewport" blend="alpha">
+	<command type="quad" tag="outline" vs="OutlineFine" ps="OutlineFine" psdefines="HWDEPTH" output="viewport" blend="alpha">
 		<texture unit="normal" name="fill" />
 		<parameter name="OutlineWidth" value="2.0" />
     </command>

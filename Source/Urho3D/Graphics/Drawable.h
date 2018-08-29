@@ -256,6 +256,33 @@ public:
 
 };
 
+/// drawable's override shader parameter animation instance
+class OverrideShaderParameterAnimationInfo : public ValueAnimationInfo
+{
+public:
+	/// Construct.
+	OverrideShaderParameterAnimationInfo
+	(Drawable* drawalbe, const String& name, int batchIndex, ValueAnimation* attributeAnimation, WrapMode wrapMode, float speed);
+	/// Copy construct.
+	OverrideShaderParameterAnimationInfo(const OverrideShaderParameterAnimationInfo& other);
+	/// Destruct.
+	~OverrideShaderParameterAnimationInfo() override;
+
+	/// Return shader parameter name.
+	const String& GetName() const {
+		return name_;
+	}
+
+protected:
+	/// Apply new animation value to the target object. Called by Update().
+	void ApplyValue(const Variant& newValue) override;
+
+private:
+	/// Shader parameter name.
+	String name_;
+	int batchIndex_;
+};
+
 /// Source data for a 3D geometry draw call.
 struct URHO3D_API SourceBatch
 {
@@ -289,32 +316,9 @@ struct URHO3D_API SourceBatch
 	SharedPtr<BIHTree> tree_;
 	/*SharedPtr<Material> oldMaterial_;
 	SharedPtr<Technique> oldTechnique_;*/
-};
-
-/// drawable's override shader parameter animation instance
-class OverrideShaderParameterAnimationInfo : public ValueAnimationInfo
-{
-public:
-	/// Construct.
-	OverrideShaderParameterAnimationInfo
-		(Drawable* drawalbe, const String& name, ValueAnimation* attributeAnimation, WrapMode wrapMode, float speed);
-	/// Copy construct.
-	OverrideShaderParameterAnimationInfo(const OverrideShaderParameterAnimationInfo& other);
-	/// Destruct.
-	~OverrideShaderParameterAnimationInfo() override;
-
-	/// Return shader parameter name.
-	const String& GetName() const {
-		return name_;
-	}
-
-protected:
-	/// Apply new animation value to the target object. Called by Update().
-	void ApplyValue(const Variant& newValue) override;
-
-private:
-	/// Shader parameter name.
-	String name_;
+	///为了lod材质切换时，材质lod切换，shader参数的变化能保留下来，在drawable级别存下这些shader参数
+	HashMap<StringHash, MaterialShaderParameter> overrideShaderParameters_;
+	HashMap<StringHash, SharedPtr<OverrideShaderParameterAnimationInfo> > overrideShaderParameterAnimationInfos_;
 };
 
 /// Base class for visible components.
@@ -531,10 +535,12 @@ public:
 
 	/// Set override shader parameter.
 	void SetOverrideShaderParameter(const String& name, const Variant& value);
+	void SetOverrideShaderParameter(int index, const String& name, const Variant& value);
 	/// Remove override shader parameter.
 	bool RemoveOverrideShaderParameter(const String& name);
+	bool RemoveOverrideShaderParameter(int index, const String& name);
 	/// 返回override shader parameters
-	HashMap<StringHash, MaterialShaderParameter>& GetOverrideShaderParameters() { return overrideShaderParameters_; }
+	HashMap<StringHash, MaterialShaderParameter>& GetOverrideShaderParameters(int index);
 	/// 设置override technique
 	void SetOverrideTechnique(Technique* overrideTechnique){ overrideTechnique_ = overrideTechnique; }
 	/// 返回override technique
@@ -547,7 +553,8 @@ public:
 	FillMode GetOverrideFillMode() { return overrideFillMode_; }
 	/// Set Override shader parameter animation.
 	void SetOverrideShaderParameterAnimation(const String& name, ValueAnimation* animation, WrapMode wrapMode = WM_LOOP, float speed = 1.0f);
-	OverrideShaderParameterAnimationInfo* GetOverrideShaderParameterAnimationInfo(const String& name) const;
+	void SetOverrideShaderParameterAnimation(int index, const String& name, ValueAnimation* animation, WrapMode wrapMode = WM_LOOP, float speed = 1.0f);
+	OverrideShaderParameterAnimationInfo* GetOverrideShaderParameterAnimationInfo(int index, const String& name) const;
 private:
 	void UpdateEventSubscription();
 	void HandleAttributeAnimationUpdate(StringHash eventType, VariantMap& eventData);
@@ -640,15 +647,12 @@ protected:
 	DynamicType dynamicType_;
 	///为了实现特效，一些drawable需要做一些额外的渲染，这些单独的pass就是做这个的。
 	HashMap<String, SharedPtr<Pass> > separatePasses_;
-	///为了lod材质切换时，材质lod切换，shader参数的变化能保留下来，在drawable级别存下这些shader参数
-	HashMap<StringHash, MaterialShaderParameter> overrideShaderParameters_;
 	///有的特效需要切换技术来实现，所以增加overrideTechnique属性，该属性会覆盖材质的技术
 	SharedPtr<Technique> overrideTechnique_;
 	///override render state
 	FillMode overrideFillMode_;
 private:
 	bool subscribed_{};
-	HashMap<StringHash, SharedPtr<OverrideShaderParameterAnimationInfo> > overrideShaderParameterAnimationInfos_;
 };
 
 inline bool CompareDrawables(Drawable* lhs, Drawable* rhs)

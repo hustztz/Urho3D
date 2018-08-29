@@ -10,8 +10,8 @@ namespace Urho3D
 {
 	DepthOfFieldFilter::DepthOfFieldFilter(Context* context, Viewport* viewPort) :
 		Filter(context, viewPort),
-		focusDistance_(30.f),
-		focalLength_(0.1f),
+		focusDistance_(100.f),
+		focalLength_(0.3f),
 		fNumber_(1.4f),
 		kFilmHeight_(0.024f)
 	{

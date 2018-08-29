@@ -23,7 +23,7 @@ vec3 fetch_eye_pos(vec2 uv)
 	#else
        float depth = DecodeDepth(depthInput.rgb);
     #endif
-	vec3 vFarRay = vec3(frustumSize.xy*uv, frustumSize.z);
+	vec3 vFarRay = vec3(frustumSize.xy*(uv*2.-1.), frustumSize.z);
     return vFarRay * depth;
 }
 
@@ -51,5 +51,5 @@ void PS()
 	vec2 rp_ss_ndc = rp_cs_pos.xy / rp_cs_pos.w;
 	vec2 rp_ss_txc = 0.5 * rp_ss_ndc + 0.5;
 	
-	gl_FragColor = vec4(vScreenPos - rp_ss_ndc, 0., 0.);
+	gl_FragColor = vec4(vScreenPos - rp_ss_txc, 0., 0.);
 }

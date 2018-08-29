@@ -17,6 +17,7 @@ varying vec3 vFarRay;
     varying vec3 vNearRay;
 #endif
 
+uniform vec2 cProjectionOffset;
 void VS()
 {
     mat4 modelMatrix = iModelMatrix;
@@ -24,7 +25,8 @@ void VS()
     gl_Position = GetClipPos(worldPos);
     #ifdef DIRLIGHT
         vScreenPos = GetScreenPosPreDiv(gl_Position);
-        vFarRay = GetFarRay(gl_Position);
+		gl_Position /= gl_Position.w;
+        vFarRay = GetFarRay(gl_Position - vec4(cProjectionOffset * 2., 0., 0.));
         #ifdef ORTHO
             vNearRay = GetNearRay(gl_Position);
         #endif

@@ -1,0 +1,6 @@
+<renderpath>
+    <command type="quad" tag="Vignette" vs="Vignette" ps="Vignette" output="viewport">
+        <texture unit="diffuse" name="viewport" />
+        <parameter name="VignetteFalloff" value="0.3" />
+    </command>
+</renderpath>

@@ -239,6 +239,7 @@ void VS()
 
 void PS()
 {
+	gl_FragDepth = 1.;
    // vec4 sky = cMatDiffColor * textureCube(sDiffCubeMap, vTexCoord);
    // #ifdef HDRSCALE
    //     sky = vec4(20.,20.,20.,1.);

@@ -4,7 +4,7 @@
 	<command type="quad" tag="DepthOfField" vs="DepthOfFieldPrefilter" ps="DepthOfFieldPrefilter" vsdefines=" " psdefines="HWDEPTH" output="depthOfFilRT1">
         <texture unit="diffuse" name="viewport" />
 		<texture unit="depth" name="depth" />
-		<parameter name="MaxCoC" value="6." />
+		<parameter name="MaxCoC" value="14." />
 		<parameter name="RcpMaxCoC" value="0.16666666666666666666666666666667" />
 		<parameter name="DofDistance" value="10." />
 		<parameter name="DofLensCoeff" value="0.34722222222222222222222222222222" />
@@ -12,7 +12,7 @@
 	<command type="quad" tag="DepthOfField" vs="DepthOfFieldBlur" ps="DepthOfFieldBlur" vsdefines="" psdefines="KERNEL_SMALL" output="depthOfFilRT2">
         <texture unit="diffuse" name="depthOfFilRT1" />
 		<parameter name="ViewportDivisior" value="2." />
-		<parameter name="MaxCoC" value="6." />
+		<parameter name="MaxCoC" value="14." />
     </command>	
 	<command type="quad" tag="DepthOfField" vs="DepthOfFieldAdditionalBlur" ps="DepthOfFieldAdditionalBlur" vsdefines="" psdefines="" output="depthOfFilRT1">
         <texture unit="diffuse" name="depthOfFilRT2" />

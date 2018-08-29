@@ -73,10 +73,11 @@ SourceBatch::~SourceBatch() = default;
 
 SourceBatch& SourceBatch::operator =(const SourceBatch& rhs)= default;
 
-OverrideShaderParameterAnimationInfo::OverrideShaderParameterAnimationInfo(Drawable* drawable, const String& name, ValueAnimation* attributeAnimation,
+OverrideShaderParameterAnimationInfo::OverrideShaderParameterAnimationInfo(Drawable* drawable, const String& name, int batchIndex, ValueAnimation* attributeAnimation,
 	WrapMode wrapMode, float speed) :
 	ValueAnimationInfo(drawable, attributeAnimation, wrapMode, speed),
-	name_(name)
+	name_(name),
+	batchIndex_(batchIndex)
 {
 }
 
@@ -86,7 +87,7 @@ OverrideShaderParameterAnimationInfo::~OverrideShaderParameterAnimationInfo() = 
 
 void OverrideShaderParameterAnimationInfo::ApplyValue(const Variant& newValue)
 {
-	static_cast<Drawable*>(target_.Get())->SetOverrideShaderParameter(name_, newValue);
+	static_cast<Drawable*>(target_.Get())->SetOverrideShaderParameter(batchIndex_, name_, newValue);
 }
 
 Drawable::Drawable(Context* context, unsigned char drawableFlags) :
@@ -131,7 +132,6 @@ Drawable::Drawable(Context* context, unsigned char drawableFlags) :
 Drawable::~Drawable()
 {
     RemoveFromOctree();
-	overrideShaderParameters_.Clear();
 }
 
 const char* ObjectDynamicType[] =
@@ -420,9 +420,23 @@ void Drawable::LimitVertexLights(bool removeConvertedLights)
     vertexLights_.Resize(MAX_VERTEX_LIGHTS);
 }
 
-void Drawable::SetOverrideShaderParameterAnimation(const String& name, ValueAnimation* animation, WrapMode wrapMode, float speed)
+void Drawable::SetOverrideShaderParameterAnimation(const String & name, ValueAnimation * animation, WrapMode wrapMode, float speed)
 {
-	OverrideShaderParameterAnimationInfo* info = GetOverrideShaderParameterAnimationInfo(name);
+	for (int i = 0; i < batches_.Size(); ++i)
+	{
+		SetOverrideShaderParameterAnimation(i, name, animation, wrapMode, speed);
+	}
+}
+
+void Drawable::SetOverrideShaderParameterAnimation(int index, const String& name, ValueAnimation* animation, WrapMode wrapMode, float speed)
+{
+	if (index >= batches_.Size())
+	{
+		URHO3D_LOGERROR(String("Drawable#SetOverrideShaderParameter的index参数超出batch的总数数!!!!!!!!"));
+		return;
+	}
+
+	OverrideShaderParameterAnimationInfo* info = GetOverrideShaderParameterAnimationInfo(index, name);
 
 	if (animation)
 	{
@@ -434,39 +448,49 @@ void Drawable::SetOverrideShaderParameterAnimation(const String& name, ValueAnim
 		}
 
 		StringHash nameHash(name);
-		overrideShaderParameterAnimationInfos_[nameHash] = new OverrideShaderParameterAnimationInfo(this, name, animation, wrapMode, speed);
+		batches_[index].overrideShaderParameterAnimationInfos_[nameHash] = new OverrideShaderParameterAnimationInfo(this, name, index, animation, wrapMode, speed);
 		UpdateEventSubscription();
 	} else
 	{
 		if (info)
 		{
 			StringHash nameHash(name);
-			overrideShaderParameterAnimationInfos_.Erase(nameHash);
-			RemoveOverrideShaderParameter(name);
+			batches_[index].overrideShaderParameterAnimationInfos_.Erase(nameHash);
+			RemoveOverrideShaderParameter(index, name);
 			UpdateEventSubscription();
 		}
 	}
 }
 
-OverrideShaderParameterAnimationInfo* Drawable::GetOverrideShaderParameterAnimationInfo(const String& name) const
+OverrideShaderParameterAnimationInfo* Drawable::GetOverrideShaderParameterAnimationInfo(int index, const String& name) const
 {
+	if (index >= batches_.Size())
+	{
+		URHO3D_LOGERROR(String("Drawable#SetOverrideShaderParameter的index参数超出batch的总数数!!!!!!!!"));
+		return nullptr;
+	}
+
 	StringHash nameHash(name);
-	HashMap<StringHash, SharedPtr<OverrideShaderParameterAnimationInfo> >::ConstIterator i = overrideShaderParameterAnimationInfos_.Find(nameHash);
-	if (i == overrideShaderParameterAnimationInfos_.End())
+	HashMap<StringHash, SharedPtr<OverrideShaderParameterAnimationInfo> >::ConstIterator i = batches_[index].overrideShaderParameterAnimationInfos_.Find(nameHash);
+	if (i == batches_[index].overrideShaderParameterAnimationInfos_.End())
 		return nullptr;
 	return i->second_;
 }
 
 void Drawable::UpdateEventSubscription()
 {
-	if (overrideShaderParameterAnimationInfos_.Size() && !subscribed_)
+	for (int i = 0; i < batches_.Size(); i++)
 	{
-		SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(Drawable, HandleAttributeAnimationUpdate));
-		subscribed_ = true;
-	} else if (subscribed_ && overrideShaderParameterAnimationInfos_.Empty())
-	{
-		UnsubscribeFromEvent(E_UPDATE);
-		subscribed_ = false;
+		if (batches_[i].overrideShaderParameterAnimationInfos_.Size() && !subscribed_)
+		{
+			SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(Drawable, HandleAttributeAnimationUpdate));
+			subscribed_ = true;
+		}
+		else if (subscribed_ && batches_[i].overrideShaderParameterAnimationInfos_.Empty())
+		{
+			UnsubscribeFromEvent(E_UPDATE);
+			subscribed_ = false;
+		}
 	}
 }
 
@@ -478,22 +502,26 @@ void Drawable::HandleAttributeAnimationUpdate(StringHash eventType, VariantMap& 
 	// Keep weak pointer to self to check for destruction caused by event handling
 	WeakPtr<Object> self(this);
 
-	Vector<String> finishedNames;
-	for (HashMap<StringHash, SharedPtr<OverrideShaderParameterAnimationInfo> >::ConstIterator i = overrideShaderParameterAnimationInfos_.Begin();
-	i != overrideShaderParameterAnimationInfos_.End(); ++i)
+	for (int j = 0; j < batches_.Size(); ++j)
 	{
-		bool finished = i->second_->Update(timeStep);
-		// If self deleted as a result of an event sent during animation playback, nothing more to do
-		if (self.Expired())
-			return;
+		Vector<String> finishedNames;
+		for (HashMap<StringHash, SharedPtr<OverrideShaderParameterAnimationInfo> >::ConstIterator i = batches_[j].overrideShaderParameterAnimationInfos_.Begin();
+			i != batches_[j].overrideShaderParameterAnimationInfos_.End(); ++i)
+		{
+			bool finished = i->second_->Update(timeStep);
+			// If self deleted as a result of an event sent during animation playback, nothing more to do
+			if (self.Expired())
+				return;
 
-		if (finished)
-			finishedNames.Push(i->second_->GetName());
+			if (finished)
+				finishedNames.Push(i->second_->GetName());
+		}
+
+
+		// Remove finished animations
+		for (unsigned i = 0; i < finishedNames.Size(); ++i)
+			SetOverrideShaderParameterAnimation(j, finishedNames[i], nullptr);
 	}
-
-	// Remove finished animations
-	for (unsigned i = 0; i < finishedNames.Size(); ++i)
-		SetOverrideShaderParameterAnimation(finishedNames[i], nullptr);
 }
 
 void Drawable::OnNodeSet(Node* node)
@@ -608,7 +636,15 @@ Pass* Drawable::GetPass(const String& passName)
 	return nullptr;
 }
 
-void Drawable::SetOverrideShaderParameter(const String& name, const Variant& value)
+void Drawable::SetOverrideShaderParameter(const String & name, const Variant & value)
+{
+	for (int i = 0; i < batches_.Size(); ++i)
+	{
+		SetOverrideShaderParameter(i, name, value);
+	}
+}
+
+void Drawable::SetOverrideShaderParameter(int index, const String& name, const Variant& value)
 {
 #ifdef 	URHO3D_THREADING
 	if (!Thread::IsMainThread())
@@ -617,16 +653,32 @@ void Drawable::SetOverrideShaderParameter(const String& name, const Variant& val
 		return;
 	}
 #endif
+	if (index >= batches_.Size())
+	{
+		URHO3D_LOGERROR(String("Drawable#SetOverrideShaderParameter的index参数超出batch的总数数!!!!!!!!"));
+		return;
+	}
+
 	MaterialShaderParameter newParam;
 	newParam.name_ = name;
 	newParam.value_ = value;
 
 	StringHash nameHash(name);
 	
-	overrideShaderParameters_[nameHash] = newParam;
+	batches_[index].overrideShaderParameters_[nameHash] = newParam;
 }
 
-bool Drawable::RemoveOverrideShaderParameter(const String& name)
+bool Drawable::RemoveOverrideShaderParameter(const String & name)
+{
+	bool state = true;
+	for (int i = 0; i < batches_.Size(); ++i)
+	{
+		state &= RemoveOverrideShaderParameter(i, name);
+	}
+	return state;
+}
+
+bool Drawable::RemoveOverrideShaderParameter(int index, const String& name)
 {
 #ifdef 	URHO3D_THREADING
 	if (!Thread::IsMainThread())
@@ -635,13 +687,29 @@ bool Drawable::RemoveOverrideShaderParameter(const String& name)
 		return false;
 	}
 #endif
-	StringHash nameHash(name);
-	HashMap<StringHash, MaterialShaderParameter>::Iterator iter = overrideShaderParameters_.Find(nameHash);
-	if (iter != overrideShaderParameters_.End())
+	if (index >= batches_.Size())
 	{
-		overrideShaderParameters_.Erase(nameHash);
+		URHO3D_LOGERROR(String("Drawable#SetOverrideShaderParameter的index参数超出batch的总数数!!!!!!!!"));
+		return false;
+	}
+
+	StringHash nameHash(name);
+	HashMap<StringHash, MaterialShaderParameter>::Iterator iter = batches_[index].overrideShaderParameters_.Find(nameHash);
+	if (iter != batches_[index].overrideShaderParameters_.End())
+	{
+		batches_[index].overrideShaderParameters_.Erase(nameHash);
 	}
 	return true;
+}
+
+HashMap<StringHash, MaterialShaderParameter>& Drawable::GetOverrideShaderParameters(int index)
+{
+	if (index >= batches_.Size())
+	{
+		URHO3D_LOGERROR(String("Drawable#SetOverrideShaderParameter的index参数超出batch的总数数!!!!!!!!"));
+		return batches_[batches_.Size()-1].overrideShaderParameters_;
+	}
+	return batches_[index].overrideShaderParameters_;
 }
 
 	bool WriteDrawablesToOBJ(PODVector<Drawable*> drawables, File* outputFile, bool asZUp, bool asRightHanded, bool writeLightmapUV)

@@ -8,12 +8,12 @@
 #include "../../Filter/VolumeInfluenceFilter.h"
 #include "../../Filter/UnshadedColorFilter.h"
 #include "../../Scene/Component.h"
-#include "../../Graphics/Drawable.h"
 #include "../../Graphics/Material.h"
 #include "../../Resource/ResourceCache.h"
 #include "../../Graphics/Renderer.h"
 #include "../../Filter/TranslucentFilter.h"
-#include "../..//Scene/ValueAnimation.h"
+#include "../../Scene/ValueAnimation.h"
+#include "../../Filter/TranslucentAfterHDRFilter.h"
 
 namespace Urho3D
 {
@@ -267,7 +267,25 @@ void ModelEffectUtil::SetModelTransparent(Node * node, float alpha)
 				if (!drawable)
 					continue;
 				drawable->SetOverrideTechnique(technique);
-				drawable->SetOverrideShaderParameter("MatDiffColor", Color(1.f, 1.f, 1.f, alpha));
+				for (int j = 0; j < drawable->GetBatches().Size(); ++j)
+				{
+					if (drawable->GetBatches()[j].material_)
+					{
+						auto& varient = drawable->GetBatches()[j].material_->GetShaderParameter("MatDiffColor");
+						if (varient != Variant::EMPTY)
+						{
+							drawable->SetOverrideShaderParameter(j, "MatDiffColor", Color(varient.GetColor(), alpha));
+						}
+						else
+						{
+							drawable->SetOverrideShaderParameter(j, "MatDiffColor", Color(1.f, 1.f, 1.f, alpha));
+						}
+					}
+					else
+					{
+						drawable->SetOverrideShaderParameter(j, "MatDiffColor", Color(1.f, 1.f, 1.f, alpha));
+					}
+				}
 			}
 		}
 	}
@@ -438,6 +456,31 @@ void ModelEffectUtil::CancelTranslucent(const Viewport* viewport, Node * node)
 	}
 	translucentFilter->ClearModel(node);
 }
+
+void ModelEffectUtil::SetTranslucentAfterHDR(const Viewport* viewport, Node * node)
+{
+	if (!node)
+		return;
+	auto* translucentFilter = viewport->GetFilter<TranslucentAfterHDRFilter>();
+	if (!translucentFilter)
+	{
+		URHO3D_LOGERROR("ModelEffectUtil#SetTranslucentAfterHDR调用过程时，TranslucentAfterHDRFilter还没有添加到viewport中");
+		return;
+	}
+	translucentFilter->AddModel(node);
+}
+void ModelEffectUtil::CancelTranslucentAfterHDR(const Viewport* viewport, Node * node)
+{
+	if (!node)
+		return;
+	auto* translucentFilter = viewport->GetFilter<TranslucentAfterHDRFilter>();
+	if (!translucentFilter)
+	{
+		URHO3D_LOGERROR("ModelEffectUtil#CancelTranslucentAfterHDR调用过程时，TranslucentAfterHDRFilter还没有添加到viewport中");
+		return;
+	}
+	translucentFilter->ClearModel(node);
+}
 void ModelEffectUtil::SetBloom(Node * node, Color color)
 {
 	if (!node)
@@ -580,22 +623,23 @@ void ModelEffectUtil::SetTwinkle(Node * node, float period, Color color)
 						}
 					}
 				}*/
-				if (drawable->GetBatches().Size() > 0 && drawable->GetBatches()[i].material_)
+				for( int j = 0; j < drawable->GetBatches().Size(); ++j)
+				if (drawable->GetBatches().Size() > 0 && drawable->GetBatches()[j].material_)
 				{
-					if (drawable->GetBatches()[i].material_->GetShaderParameter("MatDiffColor") != Variant::EMPTY)
+					if (drawable->GetBatches()[j].material_->GetShaderParameter("MatDiffColor") != Variant::EMPTY)
 					{
 						SharedPtr<ValueAnimation> colorAnimation(new ValueAnimation(drawable->GetContext()));
-						colorAnimation->SetKeyFrame(0.0f, drawable->GetBatches()[i].material_->GetShaderParameter("MatDiffColor").GetColor());
+						colorAnimation->SetKeyFrame(0.0f, drawable->GetBatches()[j].material_->GetShaderParameter("MatDiffColor").GetColor());
 						colorAnimation->SetKeyFrame(period / 2.f, color);
-						colorAnimation->SetKeyFrame(period, drawable->GetBatches()[i].material_->GetShaderParameter("MatDiffColor").GetColor());
-						drawable->SetOverrideShaderParameterAnimation("MatDiffColor", colorAnimation);
+						colorAnimation->SetKeyFrame(period, drawable->GetBatches()[j].material_->GetShaderParameter("MatDiffColor").GetColor());
+						drawable->SetOverrideShaderParameterAnimation(j, "MatDiffColor", colorAnimation);
 					}else
 					{
 						SharedPtr<ValueAnimation> colorAnimation(new ValueAnimation(drawable->GetContext()));
 						colorAnimation->SetKeyFrame(0.0f, Color::WHITE);
 						colorAnimation->SetKeyFrame(period / 2.f, color);
 						colorAnimation->SetKeyFrame(period, Color::WHITE);
-						drawable->SetOverrideShaderParameterAnimation("MatDiffColor", colorAnimation);
+						drawable->SetOverrideShaderParameterAnimation(j, "MatDiffColor", colorAnimation);
 					}
 				}
 			}
@@ -697,5 +741,12 @@ void ModelEffectUtil::CancelNormalShowEffect(Node * node)
 			CancelNormalShowEffect(node->GetChild(i));
 		}
 	}
+}
+void ModelEffectUtil::SetFireEffect(Node * node, Color color)
+{
+	
+}
+void ModelEffectUtil::CancelFireEffect(Node * node)
+{
 }
 }

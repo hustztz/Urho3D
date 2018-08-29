@@ -88,7 +88,18 @@ void VS()
     #endif
 
     #if defined(NORMALMAP) || defined(DIRBILLBOARD)
-        vec4 tangent = GetWorldTangent(modelMatrix);
+		vec4 tangent;
+		//= GetWorldTangent(modelMatrix);
+		if(abs(vNormal.x)<0.99)
+		{
+			tangent = vec4(cross(vNormal,vec3(1.,0.,0.)),0.);
+		} else if(abs(vNormal.y)<0.99)
+		{
+			tangent = vec4(cross(vNormal,vec3(0.,1.,0.)),0.);
+		} else
+		{
+			tangent = vec4(cross(vNormal,vec3(0.,0.,1.)),0.);
+		}
         vec3 bitangent = cross(tangent.xyz, vNormal) * tangent.w;
         vTexCoord = vec4(GetTexCoord(iTexCoord), bitangent.xy);
         vTangent = vec4(tangent.xyz, bitangent.z);

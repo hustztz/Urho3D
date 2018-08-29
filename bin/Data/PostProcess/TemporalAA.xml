@@ -1,19 +1,14 @@
 <renderpath>
-    <rendertarget name="velocitybuffer" tag="TemporalAA" sizedivisor="1 1" format="rgba16f" filter="true" />
     <rendertarget name="previewport" tag="TemporalAA" sizedivisor="1 1" format="rgba" filter="true" persistent="true" />
 	
-	<command type="clear" color="0.0 0.0 0.0 0.0" output="velocitybuffer" />
-	<command type="quad" tag="TemporalAA" vs="GenerateVelocityBuffer" ps="GenerateVelocityBuffer" vsdefines="HWDEPTH" psdefines="HWDEPTH" output="velocitybuffer">
-		<parameter name="LastVPMatrix" value="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0" />
-	</command>
     <command type="quad" tag="TemporalAA" vs="TemporalAA" ps="TemporalAA" vsdefines="" psdefines="HWDEPTH USE_DILATION MINMAX_3X3_ROUNDED USE_YCOCG USE_CLIPPING USE_OPTIMIZATIONS" output="viewport">
         <texture unit="diffuse" name="previewport" />
-		<texture unit="normal" name="velocitybuffer" />
 		<texture unit="depth" name="depth" />
 		<texture unit="specular" name="viewport" />
 		<parameter name="TemporlAAFeedbackMin" value="0.88" />
 		<parameter name="TemporlAAFeedbackMax" value="0.97" />
 		<parameter name="TemporlAAJitterUV" value="0 0" />
+		<parameter name="LastVPMatrix" value="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0" />
     </command>
 	
     <command type="quad" tag="TemporalAA" vs="CopyFramebuffer" ps="CopyFramebuffer" output="previewport">

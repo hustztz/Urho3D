@@ -224,11 +224,11 @@ vec4 temporal_reprojection(vec2 ss_txc, vec2 ss_vel, float vs_dist)
 #endif
 
 	// clamp to neighbourhood of current sample
-#ifdef USE_CLIPPING
-	vec4 texel1clip = clip_aabb(cmin.xyz, cmax.xyz, clamp(cavg, cmin, cmax), texel1);
-#else
+//#ifdef USE_CLIPPING
+//	vec4 texel1clip = clip_aabb(cmin.xyz, cmax.xyz, clamp(cavg, cmin, cmax), texel1);
+//#else
 	vec4 texel1clip = clamp(texel1, cmin, cmax);
-#endif
+//#endif
 
 	// feedback weight from unbiased luminance diff (t.lottes)
 #ifdef USE_YCOCG
@@ -246,7 +246,7 @@ vec4 temporal_reprojection(vec2 ss_txc, vec2 ss_vel, float vs_dist)
 	
 	texel1 = mix(texel1clip, texel1, speedFactor);
 	// output
-	return mix(texel0, texel1, k_feedback);
+	return mix(texel0, texel1clip, k_feedback);
 }
 
 vec4 sample_color_motion(sampler2D tex, vec2 uv, vec2 ss_vel)

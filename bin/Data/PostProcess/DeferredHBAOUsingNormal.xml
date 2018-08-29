@@ -3,22 +3,23 @@
 	<rendertarget name="aoBlur" tag="HBAO" sizedivisor="1 1" format="rgba" filter="true" />
 	<command type="clear" color="0.0 0.0 0.0 1.0" depth="1.0" output="aoOuput" />
     <command type="quad" tag="HBAO" vs="DeferredHBAO" ps="DeferredHBAO" vsdefines="HWDEPTH" psdefines="HWDEPTH" blend="replace" output="aoOuput">
+        <texture unit="normal" name="normal" />
         <texture unit="depth" name="depth" />
 		<texture unit="diffuse" name="Textures/Noise/tex11.png" />
 		
 		<parameter name="AORadius" value="20" />
 		<parameter name="AORadiusInv" value="0.05" />
 		<parameter name="AORadiusSqr" value="400." />
-		<parameter name="AONumDir" value="8.0" />
-		<parameter name="NumSteps" value="4.0" />
-		<parameter name="UseNormal" value="0" />
+		<parameter name="AONumDir" value="4.0" />
+		<parameter name="NumSteps" value="2.0" />
+		<parameter name="UseNormal" value="1" />
 		<parameter name="AOAttenuation" value="1.0" />
 		<parameter name="AOAngleBias" value="0.523" />
 		<parameter name="AOTanAngleBias" value="0.577" />
 		<parameter name="AOContrast" value="1.0" />
     </command>	
 	<command type="clear" color="0.0 0.0 0.0 1.0" depth="1.0" output="aoBlur" />
-	<command type="quad" tag="HBAO" vs="BilateralBlur" ps="BilateralBlur" vsdefines="" psdefines="HWDEPTH XBLUR" output="aoBlur">
+	<command type="quad" tag="HBAO" vs="BilateralBlur" ps="BilateralBlur" vsdefines="" psdefines="XBLUR" output="aoBlur">
 		<texture unit="diffuse" name="aoOuput" />
 		<texture unit="depth" name="depth" />
 		
@@ -26,7 +27,7 @@
 		<parameter name="BilateralSharpness" value="10." />
 		<parameter name="BilateralBlurCombine" value="0." />
     </command>
-	<command type="quad" tag="HBAO" vs="BilateralBlur" ps="BilateralBlur" vsdefines="" psdefines="HWDEPTH YBLUR" output="viewport" >
+	<command type="quad" tag="HBAO" vs="BilateralBlur" ps="BilateralBlur" vsdefines="" psdefines="YBLUR" output="viewport" >
 		<texture unit="diffuse" name="aoBlur" />
 		<texture unit="depth" name="depth" />
 		<texture unit="specular" name="viewport" />

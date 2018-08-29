@@ -32,6 +32,11 @@ class EditorSelectEffectInfoData
         mDrawEffectDesc.SetAble(able);
     }
 
+    bool IsPostEffect()
+    {
+        return mDrawEffectDesc.PostEffect;
+    }
+
     bool GetAble()
     {
         return mAble;
@@ -111,6 +116,8 @@ class EditorSelectEffectWindow
 {
     Window@ mSelectEffectWindow;
     ListView@ mEffectList;
+    UIElement@ mPostEffectItem;
+    UIElement@ mModelEffectItem;
 
     EditorSelectEffectWindow()
     {
@@ -137,6 +144,30 @@ class EditorSelectEffectWindow
 
     void InitDisplayList()
     {
+        {
+            mModelEffectItem = UIElement();
+            mModelEffectItem.SetFixedSize(340, 40);
+            mModelEffectItem.indent       = 20;
+            mModelEffectItem.defaultStyle = uiStyle;
+            Text@ text = Text();
+            text.position = IntVector2(20,0);
+            text.text = "模型效果(ModelEffect)";
+            text.fontSize = 14; 
+            mModelEffectItem.AddChild(text);
+            mEffectList.InsertItem(mEffectList.numItems, mModelEffectItem, null);
+        }
+        {
+            mPostEffectItem = UIElement();
+            mPostEffectItem.SetFixedSize(340, 40);
+            mPostEffectItem.indent       = 20;
+            mPostEffectItem.defaultStyle = uiStyle;
+            Text@ text = Text();
+            text.position = IntVector2(20,0);
+            text.text = "后期效果(PostEffect)";
+            text.fontSize = 14;
+            mPostEffectItem.AddChild(text);
+            mEffectList.InsertItem(mEffectList.numItems, mPostEffectItem, null);
+        }
         gEditorSelectEffectInfoDataMgr.Traverse(TraverseEffectInfoDataFunc(this.AddListItem));
         int numItems = mEffectList.numItems;
         for(int i=0; i < numItems; ++i)
@@ -151,12 +182,11 @@ class EditorSelectEffectWindow
         String effecname = infodata.GetEffectName();
         
         UIElement@ item = UIElement();
-        item.SetMinSize(340, 20);
+        item.SetFixedSize(340, 30);
         item.indent       = 20;
         item.defaultStyle = uiStyle;
-
         Text@ text = Text();
-        text.position = IntVector2(20,0);
+        text.position = IntVector2(30,0);
         text.text = effecname;
         text.fontSize = 13; 
         item.AddChild(text);
@@ -172,11 +202,11 @@ class EditorSelectEffectWindow
         
         Array<UIElement@>@ argwnds = infodata.CreateArgWnd();
         
-        mEffectList.InsertItem(mEffectList.numItems, item, null);
+        mEffectList.InsertItem(mEffectList.numItems, item, infodata.IsPostEffect()? mPostEffectItem : mModelEffectItem);
         int index = mEffectList.numItems;
         for(int i=0; i < argwnds.length; ++i)
         {
-            argwnds[i].position = IntVector2(40,0);
+            argwnds[i].position = IntVector2(60,0);
             mEffectList.InsertItem(index + i, argwnds[i], item);
         }
     }

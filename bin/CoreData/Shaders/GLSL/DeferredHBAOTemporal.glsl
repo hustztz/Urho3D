@@ -19,6 +19,7 @@ uniform float cAOAttenuation;
 uniform float cAOAngleBias;
 uniform float cAOTanAngleBias;
 uniform float cAOContrast;
+uniform vec2 cAORandom;
 #endif
 
 #ifdef COMPILEPS
@@ -353,10 +354,10 @@ void PS()
 
     vec2 randVec2 = random2(vScreenPos);
 	vec3 rand;
-	float angle = 2. * 3.1415926 * randVec2.x / cNumSteps; 
+	float angle = 2. * 3.1415926 * (randVec2.x+cAORandom.x) / 2. / cNumSteps; 
 	rand.x = cos(angle);
 	rand.y = sin(angle);
-	rand.z = randVec2.y;
+	rand.z = (randVec2.y+cAORandom.y)/2.;
 	
 	float ao = 0.;
 	float d;

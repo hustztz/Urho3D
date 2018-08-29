@@ -6,7 +6,7 @@ void ExportSceneToOBJ(String fileName)
 {
     if (fileName.empty)
     {
-        MessageBox("File name for OBJ export unspecified");
+        MessageBox("导出obj的文件名不能为空");
         return;
     }
     // append obj extension if missing
@@ -16,14 +16,14 @@ void ExportSceneToOBJ(String fileName)
     Octree@ octree = scene.GetComponent("Octree");
     if (octree is null)
     {
-        MessageBox("Octree missing from scene");
+        MessageBox("场景中不存在八叉树组件");
         return;
     }
         
     Array<Drawable@> drawables = octree.GetAllDrawables();
     if (drawables.length == 0)
     {
-        MessageBox("No drawables to export in the scene");
+        MessageBox("场景中没有可绘制的对象");
         return;
     }
 
@@ -32,13 +32,13 @@ void ExportSceneToOBJ(String fileName)
     File@ file = File(fileName, FILE_WRITE);
     if (WriteDrawablesToOBJ(drawables, file, objExportZUp_, objExportRightHanded_))
     {
-        MessageBox("OBJ file written to " + fileName, "Success");
+        MessageBox("导出Obj文件到:" + fileName, "成功");
         file.Close();
     }
     else
     {
         // Cleanup our file so we don't mislead anyone
-        MessageBox("Unable to write OBJ file");
+        MessageBox("写入Obj文件失败");
         file.Close();
         fileSystem.Delete(fileName);
     }
@@ -48,7 +48,7 @@ void ExportSelectedToOBJ(String fileName)
 {
     if (fileName.empty)
     {
-        MessageBox("File name for OBJ export unspecified");
+        MessageBox("导出obj的文件名不能为空");
         return;
     }
     if (GetExtension(fileName).empty)
@@ -83,12 +83,12 @@ void ExportSelectedToOBJ(String fileName)
         File@ file = File(fileName, FILE_WRITE);
         if (WriteDrawablesToOBJ(drawables, file, objExportZUp_, objExportRightHanded_))
         {
-            MessageBox("OBJ file written to " + fileName, "Success");
+            MessageBox("导出Obj文件到:" + fileName, "成功");
             file.Close();
         }
         else
         {
-            MessageBox("Unable to write OBJ file");
+            MessageBox("写入Obj文件失败");
             // Cleanup our file so we don't mislead anyone
             file.Close();
             fileSystem.Delete(fileName);
@@ -96,7 +96,7 @@ void ExportSelectedToOBJ(String fileName)
     }
     else
     {
-        MessageBox("No selected drawables to export to OBJ");
+        MessageBox("导出obj选择中没有包含可绘制的物体");
     }
 }
 

@@ -1708,7 +1708,7 @@ void Renderer::Initialize()
 
     defaultRenderPath_ = new RenderPath();
     defaultRenderPath_->Load(cache->GetResource<XMLFile>("RenderPaths/ForwardHWDepth.xml"));
-//	defaultRenderPath_->Load(cache->GetResource<XMLFile>("RenderPaths/PBRDeferredHWDepth.xml"));
+	//defaultRenderPath_->Load(cache->GetResource<XMLFile>("RenderPaths/PBRDeferredHWDepth.xml"));
 
     CreateGeometries();
     CreateInstancingBuffer();
@@ -1770,11 +1770,11 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
         vsDefines += queue.vsExtraDefines_;
         vsDefines += ' ';
     }
-    if (queue.psExtraDefines_.Length())
-    {
-        psDefines += queue.psExtraDefines_;
-        psDefines += ' ';
-    }
+	if (queue.psExtraDefines_.Length())
+	{
+		psDefines += queue.psExtraDefines_;
+		psDefines += ' ';
+	}
 
     // Add defines for VSM in the shadow pass if necessary
     if (pass->GetName() == "shadow"
@@ -1783,11 +1783,11 @@ void Renderer::LoadPassShaders(Pass* pass, Vector<SharedPtr<ShaderVariation> >& 
         vsDefines += "VSM_SHADOW ";
         psDefines += "VSM_SHADOW ";
     }
-	if (IsUsingLogDepth())
+	/*if (IsUsingLogDepth())
 	{
 		vsDefines += "LOGDEPTH ";
 		psDefines += "LOGDEPTH ";
-	}
+	}*/
 
     if (pass->GetLightingMode() == LIGHTING_PERPIXEL)
     {

@@ -11,7 +11,7 @@ void VS()
     mat4 modelMatrix = iModelMatrix;
     vec3 worldPos = GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
-    vNormal = iNormal;
+    vNormal = (vec4(iNormal, 0.)*modelMatrix).xyz;
 #ifdef LOGDEPTH
 	positionW = gl_Position.w;
 #endif	

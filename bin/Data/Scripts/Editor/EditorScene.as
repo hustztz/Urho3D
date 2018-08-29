@@ -77,7 +77,7 @@ bool ResetScene()
 
     if (messageBoxCallback is null && sceneModified)
     {
-        MessageBox@ messageBox = MessageBox("Scene has been modified.\nContinue to reset?", "Warning");
+        MessageBox@ messageBox = MessageBox("场景有改动，没有保存.\n是否继续重置?", "警告");
         if (messageBox.window !is null)
         {
             Button@ cancelButton = messageBox.window.GetChild("CancelButton", true);
@@ -209,14 +209,14 @@ bool LoadScene(const String&in fileName)
     // Always load the scene from the filesystem, not from resource paths
     if (!fileSystem.FileExists(fileName))
     {
-        MessageBox("No such scene.\n" + fileName);
+        MessageBox("不存在场景文件:\n" + fileName);
         return false;
     }
 
     File file(fileName, FILE_READ);
     if (!file.open)
     {
-        MessageBox("Could not open file.\n" + fileName);
+        MessageBox("打开文件失败:\n" + fileName);
         return false;
     }
 
@@ -308,7 +308,7 @@ bool SaveScene(const String&in fileName)
         UpdateWindowTitle();
     }
     else
-        MessageBox("Could not save scene successfully!\nSee Urho3D.log for more detail.");
+        MessageBox("保存场景失败!\n");
 
     return success;
 }
@@ -391,14 +391,14 @@ Node@ LoadNode(const String&in fileName, Node@ parent = null, bool raycastToMous
 
     if (!fileSystem.FileExists(fileName))
     {
-        MessageBox("No such node file.\n" + fileName);
+        MessageBox("节点文件不存在:\n" + fileName);
         return null;
     }
 
     File file(fileName, FILE_READ);
     if (!file.open)
     {
-        MessageBox("Could not open file.\n" + fileName);
+        MessageBox("打开文件失败:\n" + fileName);
         return null;
     }
 
@@ -426,6 +426,7 @@ Node@ LoadNode(const String&in fileName, Node@ parent = null, bool raycastToMous
                 }
             }
         }
+        UpdateNodeMru(fileName);
     }
     
 
@@ -515,7 +516,7 @@ bool SaveNode(const String&in fileName)
     File file(fileName, FILE_WRITE);
     if (!file.open)
     {
-        MessageBox("Could not open file.\n" + fileName);
+        MessageBox("打开文件失败:\n" + fileName);
         return false;
     }
 
@@ -532,7 +533,7 @@ bool SaveNode(const String&in fileName)
     if (success)
         instantiateFileName = fileName;
     else
-        MessageBox("Could not save node successfully!\nSee Urho3D.log for more detail.");
+        MessageBox("保存节点失败");
 
     return success;
 }
@@ -1379,7 +1380,7 @@ bool SceneRebuildNavigation()
         @navMeshes = editorScene.GetComponents("DynamicNavigationMesh", true);
         if (navMeshes.empty)
         {
-            MessageBox("No NavigationMesh components in the scene, nothing to rebuild.");
+            MessageBox("场景中不存在NavigationMesh组件，构建导航网格失败.");
             return false;
         }
     }
@@ -1434,7 +1435,7 @@ bool SceneRenderZoneCubemaps()
 
     if (capturedThisCall.length <= 0)
     {
-        MessageBox("No zones selected to render cubemaps for/");
+        MessageBox("没有zone选择渲染 cubemap");
     }
     return capturedThisCall.length > 0;
 }
@@ -1447,7 +1448,7 @@ bool SceneAddChildrenStaticModelGroup()
 
     if (smg is null)
     {
-        MessageBox("Must have a StaticModelGroup component selected.");
+        MessageBox("必须选择一个StaticModelGroup组件.");
         return false;
     }
 
@@ -1475,7 +1476,7 @@ bool SceneSetChildrenSplinePath(bool makeCycle)
 
     if (sp is null)
     {
-        MessageBox("Must have a SplinePath component selected.");
+        MessageBox("必须选择一个SplinePath组件");
         return false;
     }
 
@@ -1491,7 +1492,7 @@ bool SceneSetChildrenSplinePath(bool makeCycle)
     }
     else
     {
-        MessageBox("You must have a minimum two children Nodes in selected Node.");
+        MessageBox("必须选择至少2个子节点");
         return false;
     }
 
@@ -1538,6 +1539,19 @@ void UpdateSceneMru(String filename)
         uiRecentScenes.Erase(i);
 
     PopulateMruScenes();
+}
+
+void UpdateNodeMru(String filename)
+{
+    while (uiRecentNodes.Find(filename) > -1)
+        uiRecentNodes.Erase(uiRecentNodes.Find(filename));
+
+    uiRecentNodes.Insert(0, filename);
+
+    for (uint i = uiRecentNodes.length - 1; i >= maxRecentNodeCount; i--)
+        uiRecentNodes.Erase(i);
+
+    PopulateMruNodes();
 }
 
 Drawable@ GetFirstDrawable(Node@ node)

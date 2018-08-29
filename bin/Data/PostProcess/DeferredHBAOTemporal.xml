@@ -1,0 +1,59 @@
+<renderpath>
+	<rendertarget name="aoTemp1" tag="HBAO" sizedivisor="2 2" format="rgba" filter="true" />
+	<rendertarget name="aoTemp2" tag="HBAO" sizedivisor="2 2" format="rgba" filter="true" />
+	<rendertarget name="aoPreViewport" tag="HBAO" sizedivisor="2 2" format="rgba" filter="true" persistent="true" />
+
+    <command type="quad" tag="HBAO" vs="DeferredHBAOTemporal" ps="DeferredHBAOTemporal" vsdefines="HWDEPTH" psdefines="HWDEPTH" blend="replace" output="aoTemp1">
+        <texture unit="depth" name="depth" />
+		<texture unit="diffuse" name="Textures/Noise/tex11.png" />
+		<parameter name="AORandom" value="0 0" />
+		<parameter name="AORadius" value="20" />
+		<parameter name="AORadiusInv" value="0.05" />
+		<parameter name="AORadiusSqr" value="400." />
+		<parameter name="AONumDir" value="4.0" />
+		<parameter name="NumSteps" value="2.0" />
+		<parameter name="UseNormal" value="0" />
+		<parameter name="AOAttenuation" value="1.0" />
+		<parameter name="AOAngleBias" value="0.523" />
+		<parameter name="AOTanAngleBias" value="0.577" />
+		<parameter name="AOContrast" value="1.0" />
+    </command>	
+
+	
+	<command type="quad" tag="HBAO" vs="TemporalAO" ps="TemporalAO" vsdefines="" psdefines="HWDEPTH USE_DILATION MINMAX_3X3_ROUNDED USE_YCOCG USE_CLIPPING USE_OPTIMIZATIONS" output="aoTemp2">
+        <texture unit="diffuse" name="aoPreViewport" />
+		<texture unit="depth" name="depth" />
+		<texture unit="specular" name="aoTemp1" />
+		<parameter name="TemporlAAFeedbackMin" value="0.88" />
+		<parameter name="TemporlAAFeedbackMax" value="0.97" />
+		<parameter name="LastVPMatrix" value="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0" />
+    </command>
+	
+	<command type="quad" tag="HBAO" vs="CopyFramebuffer" ps="CopyFramebuffer" output="aoPreViewport">
+        <texture unit="diffuse" name="aoTemp2" />
+    </command>
+		
+	<command type="quad" tag="HBAO" vs="BilateralBlur" ps="BilateralBlur" vsdefines="" psdefines="HWDEPTH XBLUR" output="aoTemp1">
+		<texture unit="diffuse" name="aoTemp2" />
+		<texture unit="depth" name="depth" />
+		
+		<parameter name="BilateralBlurRadius" value="6." />
+		<parameter name="BilateralSharpness" value="10." />
+		<parameter name="BilateralBlurCombine" value="0." />
+    </command>
+	<command type="quad" tag="HBAO" vs="BilateralBlur" ps="BilateralBlur" vsdefines="" psdefines="HWDEPTH YBLUR" output="aoTemp2" >
+		<texture unit="diffuse" name="aoTemp1" />
+		<texture unit="depth" name="depth" />
+		<texture unit="specular" name="viewport" />
+		
+		<parameter name="BilateralBlurRadius" value="6." />
+		<parameter name="BilateralSharpness" value="10." />
+		<parameter name="BilateralBlurCombine" value="0." />
+    </command>
+	
+	<command type="quad" tag="HBAO" vs="HBAOFinal" ps="HBAOFinal" output="viewport">
+        <texture unit="diffuse" name="aoTemp2" />
+		<texture unit="specular" name="viewport" />
+    </command>
+	
+</renderpath>

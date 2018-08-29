@@ -69,4 +69,35 @@ vec4 PDsrand4( vec2 n ) {
 	return PDnrand4( n ) * 2 - 1;
 }
 
+// Encoding/decoding [0..1) floats into 8 bit/channel RG. Note that 1.0 will not be encoded properly.
+vec2 EncodeFloatRG( float v )
+{
+    vec2 kEncodeMul = vec2(1.0, 255.0);
+    float kEncodeBit = 1.0/255.0;
+    vec2 enc = kEncodeMul * v;
+    enc = fract (enc);
+    enc.x -= enc.y * kEncodeBit;
+    return enc;
+}
+float DecodeFloatRG( vec2 enc )
+{
+    vec2 kDecodeDot = vec2(1.0, 1/255.0);
+	
+    return dot( enc, kDecodeDot );
+}
+// Encoding/decoding [0..1) 8bit float into 8 bit/channel RG. Note that 1.0 will not be encoded properly.
+vec2 EncodeByteRG( float v )
+{
+   int value = int(v*255);
+   ivec2 enc8 = ivec2(value/16, value-value/16*16);
+   return vec2(enc8)/15.;
+}
+float DecodeByteRG( vec2 enc )
+{
+    ivec2 enc8 = ivec2(enc*15.);
+	int value = int(dot(enc8, ivec2(16, 1)));
+	
+    return float(value)/255.;
+}
+
 #endif

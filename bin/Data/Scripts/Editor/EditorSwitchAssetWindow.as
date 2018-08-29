@@ -10,7 +10,7 @@ ListView@ modelSplitLodInfoList;
 
 funcdef void ImportAssetHandleFunction();
 Array<ImportAssetHandleFunction@> importAssethandleMap;
-Array<String> scanSuffixList = {"*.obj", "*.fbx"};
+Array<String> scanSuffixList = {"*.obj", "*.fbx", "*.gltf"};
 Array<String> singlefileList = {"单个文件输入", "文件夹输入"};
 
 Dictionary importAssetTypeDesc;
@@ -345,7 +345,7 @@ void HandleImportAsset(StringHash eventType, VariantMap& eventData)
     if(!fileSystem.DirExists(outpath))
     {
         log.Error("输出路径不存在");
-        MessageBox("输出路径不存在", "Error");
+        MessageBox("输出路径不存在", "错误");
         return;
     }
 
@@ -354,7 +354,7 @@ void HandleImportAsset(StringHash eventType, VariantMap& eventData)
         if(!fileSystem.DirExists(inpath))
         {
             log.Error("输入路径不存在");
-            MessageBox("输入路径不存在", "Error");
+            MessageBox("输入路径不存在", "错误");
             return;
         }
     }
@@ -363,7 +363,7 @@ void HandleImportAsset(StringHash eventType, VariantMap& eventData)
         if(!fileSystem.FileExists(inpath))
         {
             log.Error("输入资源不存在");
-            MessageBox("输入资源不存在", "Error");
+            MessageBox("输入资源不存在", "错误");
             return;
         }
     }
@@ -376,7 +376,7 @@ void HandleImportAsset(StringHash eventType, VariantMap& eventData)
         if(importAssetOutFileName.text.empty)
         {
             log.Error("保存的文件名不能为空");
-            MessageBox("保存的文件名不能为空", "Error");
+            MessageBox("保存的文件名不能为空", "错误");
             return;
         }
     }

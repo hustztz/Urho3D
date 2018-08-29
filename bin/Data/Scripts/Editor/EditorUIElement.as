@@ -99,21 +99,21 @@ void OpenUILayout(const String&in fileName)
     // Check if the UI element has been opened before
     if (editorUIElement.GetChild(FILENAME_VAR, Variant(fileName)) !is null)
     {
-        MessageBox("UI element is already opened.\n" + fileName);
+        MessageBox("UI已经打开:\n" + fileName);
         return;
     }
 
     // Always load from the filesystem, not from resource paths
     if (!fileSystem.FileExists(fileName))
     {
-        MessageBox("No such file.\n" + fileName);
+        MessageBox("文件不存在:\n" + fileName);
         return;
     }
 
     File file(fileName, FILE_READ);
     if (!file.open)
     {
-        MessageBox("Could not open file.\n" + fileName);
+        MessageBox("打开文件失败:\n" + fileName);
         return;
     }
 
@@ -145,7 +145,7 @@ void OpenUILayout(const String&in fileName)
         ClearEditActions();
     }
     else
-        MessageBox("Could not load UI layout successfully!\nSee Urho3D.log for more detail.");
+        MessageBox("加载布UI局失败!");
 
     suppressUIElementChanges = false;
 }
@@ -161,7 +161,7 @@ bool CloseUILayout()
             UIElement@ element = GetTopLevelUIElement(selectedUIElements[i]);
             if (element !is null && element.vars[MODIFIED_VAR].GetBool())
             {
-                MessageBox@ messageBox = MessageBox("UI layout has been modified.\nContinue to close?", "Warning");
+                MessageBox@ messageBox = MessageBox("UI 布局有改动，没有保存.\n是否继续关闭?", "警告");
                 if (messageBox.window !is null)
                 {
                     Button@ cancelButton = messageBox.window.GetChild("CancelButton", true);
@@ -207,7 +207,7 @@ bool CloseAllUILayouts()
             UIElement@ element = editorUIElement.children[i];
             if (element !is null && element.vars[MODIFIED_VAR].GetBool())
             {
-                MessageBox@ messageBox = MessageBox("UI layout has been modified.\nContinue to close?", "Warning");
+                MessageBox@ messageBox = MessageBox("UI 布局有改动，没有保存.\n是否继续关闭?", "警告");
                 if (messageBox.window !is null)
                 {
                     Button@ cancelButton = messageBox.window.GetChild("CancelButton", true);
@@ -250,7 +250,7 @@ bool SaveUILayout(const String&in fileName)
     File file(fileName, FILE_WRITE);
     if (!file.open)
     {
-        MessageBox("Could not open file.\n" + fileName);
+        MessageBox("打开文件失败:\n" + fileName);
         return false;
     }
 
@@ -274,7 +274,7 @@ bool SaveUILayout(const String&in fileName)
         }
     }
     if (!success)
-        MessageBox("Could not save UI layout successfully!\nSee Urho3D.log for more detail.");
+        MessageBox("保存UI布局失败");
 
     return success;
 }
@@ -303,14 +303,14 @@ void LoadChildUIElement(const String&in fileName)
 
     if (!fileSystem.FileExists(fileName))
     {
-        MessageBox("No such file.\n" + fileName);
+        MessageBox("文件不存:\n" + fileName);
         return;
     }
 
     File file(fileName, FILE_READ);
     if (!file.open)
     {
-        MessageBox("Could not open file.\n" + fileName);
+        MessageBox("打开文件失败:\n" + fileName);
         return;
     }
 
@@ -356,7 +356,7 @@ bool SaveChildUIElement(const String&in fileName)
     File file(fileName, FILE_WRITE);
     if (!file.open)
     {
-        MessageBox("Could not open file.\n" + fileName);
+        MessageBox("打开文件失败:\n" + fileName);
         return false;
     }
 
@@ -373,7 +373,7 @@ bool SaveChildUIElement(const String&in fileName)
             editUIElement.vars[CHILD_ELEMENT_FILENAME_VAR] = fileName;
     }
     if (!success)
-        MessageBox("Could not save child UI element successfully!\nSee Urho3D.log for more detail.");
+        MessageBox("保存UI布局失败");
 
     return success;
 }
@@ -388,14 +388,14 @@ void SetUIElementDefaultStyle(const String&in fileName)
     // Always load from the filesystem, not from resource paths
     if (!fileSystem.FileExists(fileName))
     {
-        MessageBox("No such file.\n" + fileName);
+        MessageBox("文件不存在:\n" + fileName);
         return;
     }
 
     File file(fileName, FILE_READ);
     if (!file.open)
     {
-        MessageBox("Could not open file.\n" + fileName);
+        MessageBox("打开文件失败:\n" + fileName);
         return;
     }
 

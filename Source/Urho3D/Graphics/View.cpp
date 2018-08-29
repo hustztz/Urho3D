@@ -756,6 +756,7 @@ void View::SetCameraShaderParameters(Camera* camera)
 #endif
 
     graphics_->SetShaderParameter(VSP_VIEWPROJ, projection * camera->GetView());
+	graphics_->SetShaderParameter("ProjectionOffset", camera->GetProjectionOffset());
 
     // If in a scene pass and the command defines shader parameters, set them now
     if (passCommand_)
@@ -1340,8 +1341,8 @@ void View::GetBaseBatches()
                 if (allowInstancing && info.markToStencil_ && destBatch.lightMask_ != (destBatch.zone_->GetLightMask() & 0xffu))
                     allowInstancing = false;
 
-				if (drawable->GetOverrideShaderParameters().Size() > 0)
-					destBatch.overrideShaderParameters_ = &(drawable->GetOverrideShaderParameters());
+				if (srcBatch.overrideShaderParameters_.Size() > 0)
+					destBatch.overrideShaderParameters_ = &(drawable->GetOverrideShaderParameters(j));
 				else
 					destBatch.overrideShaderParameters_ = nullptr;
 				destBatch.overrideFillMode = drawable->GetOverrideFillMode();
@@ -1513,8 +1514,8 @@ void View::GetLitBatches(Drawable* drawable, LightBatchQueue& lightQueue, BatchQ
         {
             if (destBatch.isBase_)
             {
-				if (drawable->GetOverrideShaderParameters().Size() > 0)
-					destBatch.overrideShaderParameters_ = &(drawable->GetOverrideShaderParameters());
+				if (srcBatch.overrideShaderParameters_.Size() > 0)
+					destBatch.overrideShaderParameters_ = &(drawable->GetOverrideShaderParameters(i));
 				else
 					destBatch.overrideShaderParameters_ = nullptr;
 				destBatch.overrideFillMode = drawable->GetOverrideFillMode();

@@ -268,7 +268,7 @@ void EditHotKeyMode(StringHash eventType, VariantMap& eventData)
 {
     DropDownList@ edit = eventData["Element"].GetPtr();
     hotKeyMode = edit.selection;
-    MessageBox("Please, restart Urho editor for applying changes.\n", " Notify ");
+    MessageBox("重启编辑器,修改才能生效.\n", " 通知 ");
     
 }
 

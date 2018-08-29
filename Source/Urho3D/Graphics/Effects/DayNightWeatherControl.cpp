@@ -141,7 +141,7 @@ namespace Urho3D
 		//light->SetUsePhysicalValues(true);
 		light->SetShadowBias(BiasParameters(0.00025f, 0.5f));
 		light->SetShadowCascade(CascadeParameters(10.0f, 50.0f, 500000.0f, 0.0f, 0.8f));
-		light->SetShadowIntensity(0.5);
+		light->SetShadowIntensity(0.0);
 
 	}
 	void DayNightWeatherControl::UpdateSun()
@@ -151,11 +151,11 @@ namespace Urho3D
 			
 			auto* light = sunNode_->GetComponent<Light>();
 			indirectColor_ = ComputeIncidentLight(Vector3(0, earthRadius, 0),
-				Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_));
+				sunDir_.Negate());
 //			URHO3D_LOGERROR("indirectColor:" + indirectColor_.ToString());
 			light->SetColor(Color(indirectColor_.x_, indirectColor_.y_, indirectColor_.z_, 1.));
 			bool isUpdate = false;
-			if(Abs(lastSunDir_.DotProduct(sunDir_)) < 0.99995)
+			if(lastSunDir_.DotProduct(sunDir_) < 0.99995)
 			{
 				isUpdate = true;
 			}
@@ -193,7 +193,7 @@ namespace Urho3D
 		if(skyBoxNode_)
 		{
 			auto* skybox = skyBoxNode_->GetComponent<Skybox>();
-			skybox->GetMaterial()->SetShaderParameter("SunDir", Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_));
+			skybox->GetMaterial()->SetShaderParameter("SunDir", sunDir_.Negate());
 			skybox->GetMaterial()->SetShaderParameter("SunSpeedDir", sunSpeedDir_);
 			skybox->GetMaterial()->SetShaderParameter("Hour", hour_);
 			skybox->GetMaterial()->SetShaderParameter("IndirectColor", indirectColor_);
@@ -216,8 +216,8 @@ namespace Urho3D
 //					ambientColor = 0.8;
 //			}
 			//URHO3D_LOGERROR(String("Ambient:") + ambientColor);
-			Vector3 ambientColor = ComputeAmbientLight(Vector3(0, earthRadius, 0), Vector3(0,1,0), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_))*1.;
-			ambientColor += ComputeAmbientLight(Vector3(0, earthRadius, 0), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_), Vector3(-sunDir_.x_, -sunDir_.y_, -sunDir_.z_))*0.5;
+			Vector3 ambientColor = ComputeAmbientLight(Vector3(0, earthRadius, 0), Vector3(0,1,0), sunDir_.Negate())*1.;
+			ambientColor += ComputeAmbientLight(Vector3(0, earthRadius, 0), sunDir_.Negate(), sunDir_.Negate())*0.5;
 			float maxAmbinetColor = Max(Max(ambientColor.x_, ambientColor.y_), ambientColor.z_)*2.5;
 			ambientColor += Vector3(maxAmbinetColor, maxAmbinetColor, maxAmbinetColor);
 			if (!isHDR_)
@@ -321,7 +321,7 @@ namespace Urho3D
 	{
 		float t0, t1;
 		if (!RaySphereIntersect(orig, sunDirection, atmosphereRadius, t0, t1) || t1 < 0) return Vector3(0);
-		float tmin = 0, tmax = std::numeric_limits<float>::max();
+		float tmin = 0, tmax = M_MAX_FLOAT;
 		if (t0 > tmin && t0 > 0) tmin = t0;
 		if (t1 < tmax) tmax = t1;
 		uint32_t numSamples = 16;
@@ -348,9 +348,9 @@ namespace Urho3D
 		{
 			value = nightValue_;
 			float maxAttenuation = Max(Max(attenuation.x_, attenuation.y_), attenuation.z_);
-			attenuation.x_ = maxAttenuation;
-			attenuation.y_ = maxAttenuation;
-			attenuation.z_ = maxAttenuation;
+			attenuation.set(0, maxAttenuation);
+			attenuation.set(1, maxAttenuation);
+			attenuation.set(2, maxAttenuation);
 		}
 		if (!isHDR_)
 		{
@@ -366,7 +366,7 @@ namespace Urho3D
 	{
 		float t0, t1;
 		dir.Normalize();
-		float tmin = 0, tmax = std::numeric_limits<float>::max();
+		float tmin = 0, tmax = M_MAX_FLOAT;
 		if (!RaySphereIntersect(orig, dir, atmosphereRadius, t0, t1) || t1 < 0) return Vector3::ZERO;
 		if (t0 > tmin && t0 > 0) tmin = t0;
 		if (t1 < tmax) tmax = t1;

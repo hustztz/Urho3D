@@ -6,6 +6,10 @@ UIElement@ uiMenuBar;
 UIElement@ quickMenu;
 Menu@ recentSceneMenu;
 Window@ mruScenesPopup;
+
+Menu@ recentNodeMenu;
+Window@ mruNodesPopup;
+
 Array<QuickMenuItem@> quickMenuItems;
 FileSelector@ uiFileSelector;
 String consoleCommandInterpreter;
@@ -32,6 +36,8 @@ const uint MAX_QUICK_MENU_ITEMS = 10;
 
 const uint maxRecentSceneCount = 5;
 
+const uint maxRecentNodeCount = 5;
+
 Array<String> uiSceneFilters = {"*.xml", "*.json", "*.bin", "*.*"};
 Array<String> uiElementFilters = {"*.xml"};
 Array<String> uiAllFilters = {"*.*"};
@@ -56,6 +62,8 @@ String uiScriptPath = fileSystem.programDir + "Data/Scripts";
 String uiParticlePath = fileSystem.programDir + "Data/Particles";
 String uiRenderPathPath = fileSystem.programDir + "CoreData/RenderPaths";
 Array<String> uiRecentScenes;
+Array<String> uiRecentNodes;
+
 String screenshotDir = fileSystem.programDir + "Screenshots";
 
 bool uiFaded = false;
@@ -327,13 +335,20 @@ void CreateMenuBar()
         Menu@ menu = CreateMenu("File");
         Window@ popup = menu.popup;
         popup.AddChild(CreateMenuItem("New scene", @ResetScene, KEY_N, QUAL_SHIFT | QUAL_CTRL));
+        CreateChildDivider(popup);
+
         popup.AddChild(CreateMenuItem("Open scene...", @PickFile, KEY_O, QUAL_CTRL));
-        popup.AddChild(CreateMenuItem("Save scene", @SaveSceneWithExistingName, KEY_S, QUAL_CTRL));
-        popup.AddChild(CreateMenuItem("Save scene as...", @PickFile, KEY_S, QUAL_SHIFT | QUAL_CTRL));
         recentSceneMenu = CreateMenuItem("Open recent scene", null, SHOW_POPUP_INDICATOR);
         popup.AddChild(recentSceneMenu);
         mruScenesPopup = CreatePopup(recentSceneMenu);
         PopulateMruScenes();
+        popup.AddChild(CreateMenuItem("menu Load node", @PickFile));
+
+        recentNodeMenu = CreateMenuItem("Open recent node", null, SHOW_POPUP_INDICATOR);
+        popup.AddChild(recentNodeMenu);
+        mruNodesPopup = CreatePopup(recentNodeMenu);
+        PopulateMruNodes();
+
         CreateChildDivider(popup);
 /*
         Menu@ childMenu = CreateMenuItem("menu Load node", null, SHOW_POPUP_INDICATOR);
@@ -342,8 +357,8 @@ void CreateMenuBar()
         childPopup.AddChild(CreateMenuItem("As local...", @PickFile, 0, 0, true, "Load node as local..."));
         popup.AddChild(childMenu);
 */
-    
-        popup.AddChild(CreateMenuItem("menu Load node", @PickFile));
+        popup.AddChild(CreateMenuItem("Save scene", @SaveSceneWithExistingName, KEY_S, QUAL_CTRL));
+        popup.AddChild(CreateMenuItem("Save scene as...", @PickFile, KEY_S, QUAL_SHIFT | QUAL_CTRL));
         popup.AddChild(CreateMenuItem("Save node as...", @PickFile));
         CreateChildDivider(popup);
         popup.AddChild(CreateMenuItem("Switch Asset...", @PickFile));
@@ -479,7 +494,7 @@ void CreateMenuBar()
         for (uint i = 0; i < objectCategories.length; ++i)
         {
             // Skip the UI category for the component menus
-            if (objectCategories[i] == "UI")
+            if (objectCategories[i] == "UI" || objectCategories[i] == "Urho2D")
                 continue;
 
             Menu@ m = CreateMenuItem(objectCategories[i], null, SHOW_POPUP_INDICATOR);
@@ -594,7 +609,7 @@ bool Exit()
     {
         String message;
         if (sceneModified)
-            message = "Scene has been modified.\n";
+            message = "场景有改动，没有保存.\n";
 
         bool uiLayoutModified = false;
         for (uint i = 0; i < editorUIElement.numChildren; ++i)
@@ -603,14 +618,14 @@ bool Exit()
             if (element !is null && element.vars[MODIFIED_VAR].GetBool())
             {
                 uiLayoutModified = true;
-                message += "UI layout has been modified.\n";
+                message += "UI布局有改动，没有保存.\n";
                 break;
             }
         }
 
         if (sceneModified || uiLayoutModified)
         {
-            MessageBox@ messageBox = MessageBox(message + "Continue to exit?", "Warning");
+            MessageBox@ messageBox = MessageBox(message + "是否继续退出?", "警告");
             if (messageBox.window !is null)
             {
                 Button@ cancelButton = messageBox.window.GetChild("CancelButton", true);
@@ -1860,6 +1875,24 @@ void PopulateMruScenes()
 
 }
 
+void PopulateMruNodes()
+{
+    mruNodesPopup.RemoveAllChildren();
+    if (uiRecentNodes.length > 0)
+    {
+        recentNodeMenu.enabled = true;
+        for (uint i=0; i < uiRecentNodes.length; ++i)
+        {
+            mruNodesPopup.AddChild(CreateMenuItem(uiRecentNodes[i], @LoadMostRecentNode, 0, 0, false, "", false));
+        }
+    }
+    else
+    {
+        recentNodeMenu.enabled = false;
+    }
+}
+
+
 bool LoadMostRecentScene()
 {
     Menu@ menu = GetEventSender();
@@ -1871,6 +1904,20 @@ bool LoadMostRecentScene()
         return false;
 
     return LoadScene(text.text);
+}
+
+bool LoadMostRecentNode()
+{
+    Menu@ menu = GetEventSender();
+    if (menu is null)
+        return false;
+
+    Text@ text = menu.GetChildren()[0];
+    if (text is null)
+        return false;
+    
+    LoadNode(text.text);
+    return true;
 }
 
 // Set from click to false if opening menu procedurally.
@@ -1902,7 +1949,7 @@ void ActivateContextMenu(Array<UIElement@> actions)
     {
         contextMenu.AddChild(actions[i]);
     }
-    contextMenu.SetFixedHeight(24*actions.length+6);
+    contextMenu.SetFixedHeight(24*(actions.length+1));
     contextMenu.position = ui.cursor.screenPosition + IntVector2(10,-10);
     OpenContextMenu();
 }

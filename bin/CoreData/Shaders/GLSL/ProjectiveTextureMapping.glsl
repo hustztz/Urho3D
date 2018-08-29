@@ -63,11 +63,11 @@ void PS()
 	vec4 color = texture2D(sDiffMap, vScreenPos.xy);
 	
 	float D = texture2D(sDepthBuffer, vScreenPos).r;
-	//if( D >= 1.)
-	//{
-	//	gl_FragColor = color;
-	//	return;
-	//}
+	if( D >= 1.)
+	{
+		gl_FragColor = color;
+		return;
+	}
 	
 	vec3 vPosition = fetch_eye_pos(vScreenPos);
 	vec4 wPosition = vec4(vPosition, 1.) * viewInv;
